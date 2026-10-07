@@ -18,8 +18,9 @@ Epic Autosome competition - Large Milkweed Bug leaderboard
 | шаг | ноутбук | что внутри |
 |---|---|---|
 | 1 | `simple_model/step1_data_table.ipynb` | чтение данных, «позиция-цепь» и ориентация, валидационные контиги, таблица строк (все старты + случайные отрицательные), первый взгляд на сигнал (динуклеотид на старте, GC) |
+| 2 | `simple_model/step2_features.ipynb` + `simple_model/features.py` | 27 признаков из последовательности (Initiator, TATA, CCAAT, E-бокс, CRE, боксы тРНК, донор сплайсинга, поли-A/T, GC, CpG, повторы, найденные 6-меры); профили мотивов вокруг стартов; полезность каждого признака по отдельности |
 
-[Открыть шаг 1 в Colab](https://colab.research.google.com/github/Mitochondrion3000/epic-competiton/blob/claude/gracious-brown-4ybsmj/simple_model/step1_data_table.ipynb) (CPU достаточно)
+Открыть в Colab: [шаг 1](https://colab.research.google.com/github/Mitochondrion3000/epic-competiton/blob/claude/gracious-brown-4ybsmj/simple_model/step1_data_table.ipynb), [шаг 2](https://colab.research.google.com/github/Mitochondrion3000/epic-competiton/blob/claude/gracious-brown-4ybsmj/simple_model/step2_features.ipynb) (CPU достаточно; шаг 2 читает таблицу, сохранённую шагом 1 на Google Диск)
 
 ## Как запустить v2
 
