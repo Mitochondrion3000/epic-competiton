@@ -70,3 +70,49 @@ def score_track(o, pwm):
     s = np.maximum(f, r)
     s[L - w + 1:] = -1e9
     return s
+
+
+def max_scores(X, pwms, lo, hi, chunk=1000):
+    """Как window_scores, но сразу максимум по окну: n x G (лучший сайт каждого мотива в окне)."""
+    G, w, _ = pwms.shape
+    Wf = pwms.reshape(G, -1).T; Wr = pwms[:, ::-1, ::-1].reshape(G, -1).T
+    out = []
+    for c in range(0, len(X), chunk):
+        V = sliding_window_view(X[c:c + chunk], (w, 4), axis=(1, 2))[:, lo:hi, 0]
+        n = V.shape[0]; V = np.ascontiguousarray(V.reshape(-1, w * 4))
+        out.append(np.maximum(V @ Wf, V @ Wr).reshape(n, hi - lo, G).max(1))
+    return np.concatenate(out)
+
+
+def site_thresholds(X_bg, pwms, q=0.9999, chunk=500):
+    """Порог счёта для каждого мотива: квантиль q счёта во всех позициях фоновых окон.
+    q = 0.9999 значит, что в случайной ДНК сайт с таким счётом встречается примерно раз на 10 000 позиций."""
+    G, w, _ = pwms.shape
+    Wf = pwms.reshape(G, -1).T; Wr = pwms[:, ::-1, ::-1].reshape(G, -1).T
+    parts = []
+    for c in range(0, len(X_bg), chunk):
+        V = sliding_window_view(X_bg[c:c + chunk], (w, 4), axis=(1, 2))[:, :, 0]
+        V = np.ascontiguousarray(V.reshape(-1, w * 4))
+        parts.append(np.maximum(V @ Wf, V @ Wr))
+    return np.quantile(np.concatenate(parts), q, axis=0)
+
+
+def kmer_best_match(kmer, motifs, bg, top=3, min_ratio=0.9):
+    """С какими мотивами базы совпадает k-мер. Для каждого мотива ищем место и ориентацию, где k-мер набирает не меньше
+    min_ratio от максимально возможного счёта, и среди таких мест берём самое информативное (наибольший счёт в битах):
+    короткий k-мер «помещается» во многие длинные мотивы, но осмысленно только совпадение с их ядром."""
+    idx = ["ACGT".index(c) for c in kmer]; k = len(kmer)
+    res = []
+    for name, tf, pfm in motifs:
+        pwm = pwm_from_pfm(pfm, bg)
+        best = -np.inf
+        for P in (pwm, pwm[::-1, ::-1]):
+            for s in range(0, len(P) - k + 1):
+                sub = P[s:s + k]
+                got, mx = sub[np.arange(k), idx].sum(), sub.max(1).sum()
+                if mx > 0 and got >= min_ratio * mx:
+                    best = max(best, got)
+        if best > -np.inf:
+            res.append((float(best), tf, name))
+    res.sort(reverse=True)
+    return res[:top]

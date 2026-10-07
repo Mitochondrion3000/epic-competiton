@@ -44,13 +44,19 @@ DESCRIPTIONS = {
     "inr_pwm": "похожесть на Initiator: сумма log2(частота у стартов / фон) по буквам −5..+5",
     "inr_yr":  "классический Inr: пиримидин (C/T) на −1 и пурин (A/G) на 0",
     "div_inr": "дивергентный старт: лучший inr_pwm на противоположной цепи в 50–300 нт выше",
+    "gc_1k": "доля G+C в ±1000 нт (широкий контекст)",
+    "cpg_1k": "CpG наблюдаемое/ожидаемое в ±1000 нт",
+    "rep_1k": "доля повторов в ±1000 нт",
+    "polyAT_1k": "участки AAAAAA/TTTTTT в ±1000 нт",
+    "splice_far": "доноры сплайсинга GTRAGT в +300..+2000 (дальше в теле гена)",
     **{k: v[4] for k, v in MOTIFS.items()},
     **{k: v[3] for k, v in COMPOSITION.items()},
 }
 GROUPS = {"сам старт": ["inr_pwm", "inr_yr"], "дивергентность": ["div_inr"],
           "мотивы промотора": ["tata", "ccaat", "ebox", "cre"], "гены тРНК (Pol III)": ["trna_abox", "trna_bbox"],
           "структура гена": ["splice_down"], "поли-A/T": ["polyAT_core", "polyAT_up"],
-          "состав": ["gc_core", "gc_up", "gc_down", "cpg_core", "cpg_down"], "повторы": ["rep_core", "rep_here"]}
+          "состав": ["gc_core", "gc_up", "gc_down", "cpg_core", "cpg_down"], "повторы": ["rep_core", "rep_here"],
+          "широкий контекст": ["gc_1k", "cpg_1k", "rep_1k", "polyAT_1k", "splice_far"]}
 PWM_A, PWM_B = -5, 5
 
 
@@ -153,10 +159,20 @@ def strand_features(o, lw, i, inr_here, inr_other, params):
     # --- k-меры, найденные по данным (шаг 2, раздел 3) ---
     for name, a, b in params.get("kmers", []):
         yield f"kmer_{name}", window_sum(motif_hits(o, name), i, a, b)
-    # --- мотивы факторов транскрипции из JASPAR/HOCOMOCO (шаг 3): число сайтов с счётом >= порога в окне ---
+    # --- мотивы факторов транскрипции из JASPAR/HOCOMOCO (шаг 3): число сайтов со счётом >= порога в окне ---
     for m in params.get("tf", []):
         hit = score_track(o, np.asarray(m["pwm"], np.float32)) >= m["thr"]
-        yield f"tf_{m['name']}", window_sum(hit, i, m["a"], m["b"])
+        for suffix, (a, b) in m["windows"].items():                 # один мотив может давать признаки в нескольких окнах
+            yield f"tf_{m['name']}{suffix}", window_sum(hit, i, a, b)
+        del hit
+    # --- широкий контекст ±1000 нт (шаг 3) ---
+    if params.get("wide"):
+        n = np.maximum(window_sum(valid, i, -1000, 1000), 1)
+        yield "gc_1k", window_sum(gc, i, -1000, 1000) / n
+        yield "cpg_1k", window_sum(cg, i, -1000, 1000) * n / np.maximum(window_sum(o == 1, i, -1000, 1000) * window_sum(o == 2, i, -1000, 1000), 1)
+        yield "rep_1k", window_sum(lw, i, -1000, 1000) / 2001
+        yield "polyAT_1k", window_sum(motif_hits(o, "AAAAAA") | motif_hits(o, "TTTTTT"), i, -1000, 1000)
+        yield "splice_far", window_sum(motif_hits(o, "GTRAGT"), i, 300, 2000)
 
 
 def contig_features(seq, low, positions, strands, params, only=None):
