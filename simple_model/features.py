@@ -197,3 +197,19 @@ def contig_features(seq, low, positions, strands, params, only=None):
             if only is None or k in only:
                 out.setdefault(k, np.zeros(len(positions), np.float32))[sel] = v
     return out
+
+
+def feature_matrix(seq, low, positions, strands, params, names):
+    """То же, что contig_features, но сразу в матрицу float32 (строки x names) в заданном порядке колонок:
+    так экономнее по памяти для миллионов позиций (плотная валидация, тест)."""
+    L = len(seq); col = {n: k for k, n in enumerate(names)}
+    X = np.zeros((len(positions), len(names)), np.float32)
+    inr = {st: pwm_track(oriented(seq, low, st)[0], params["pwm"]) for st in ("+", "-")}
+    for st in ("+", "-"):
+        sel = np.flatnonzero(strands == st)
+        if len(sel) == 0: continue
+        o, lw = oriented(seq, low, st)
+        i = to_index(positions[sel], L, st)
+        for k, v in strand_features(o, lw, i, inr[st], inr["-" if st == "+" else "+"], params):
+            if k in col: X[sel, col[k]] = v
+    return X
