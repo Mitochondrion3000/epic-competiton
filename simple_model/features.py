@@ -45,6 +45,9 @@ DESCRIPTIONS = {
     "inr_yr":  "классический Inr: пиримидин (C/T) на −1 и пурин (A/G) на 0",
     "div_inr": "дивергентный старт: лучший inr_pwm на противоположной цепи в 50–300 нт выше",
     "gc_1k": "доля G+C в ±1000 нт (широкий контекст)",
+    "inr_vs_3": "inr_pwm минус лучший inr_pwm в ±3 нт (0 = лучшая позиция среди ближайших соседей)",
+    "inr_vs_10": "то же в ±10 нт",
+    "inr_vs_25": "то же в ±25 нт",
     "cpg_1k": "CpG наблюдаемое/ожидаемое в ±1000 нт",
     "rep_1k": "доля повторов в ±1000 нт",
     "polyAT_1k": "участки AAAAAA/TTTTTT в ±1000 нт",
@@ -56,6 +59,7 @@ GROUPS = {"сам старт": ["inr_pwm", "inr_yr"], "дивергентнос�
           "мотивы промотора": ["tata", "ccaat", "ebox", "cre"], "гены тРНК (Pol III)": ["trna_abox", "trna_bbox"],
           "структура гена": ["splice_down"], "поли-A/T": ["polyAT_core", "polyAT_up"],
           "состав": ["gc_core", "gc_up", "gc_down", "cpg_core", "cpg_down"], "повторы": ["rep_core", "rep_here"],
+          "локальный контраст": ["inr_vs_3", "inr_vs_10", "inr_vs_25"],
           "широкий контекст": ["gc_1k", "cpg_1k", "rep_1k", "polyAT_1k", "splice_far"]}
 PWM_A, PWM_B = -5, 5
 
@@ -94,15 +98,12 @@ def window_sum(track, idx, a, b):
 
 
 def window_max(track, idx, a, b, fill=0.0):
-    """Максимум track[i+a .. i+b] для каждого i из idx."""
+    """Максимум track[i+a .. i+b] для каждого i из idx; позиции за краями контига считаются равными fill."""
     n = b - a + 1
-    pad = np.concatenate([track, np.full(n, fill, track.dtype)])
+    pad = np.concatenate([np.full(n, fill, track.dtype), track, np.full(n, fill, track.dtype)])
     cen = maximum_filter1d(pad, n, mode="nearest")            # окно с центром: cen[k] = max(pad[k - n//2 : k - n//2 + n])
-    j = idx + a                                               # нужно max(pad[j : j+n]) = cen[j + n//2]
-    out = np.full(len(idx), fill, np.float32)
-    ok = (j >= 0) & (j < len(track))
-    out[ok] = cen[j[ok] + n // 2]
-    return out
+    j = np.clip(idx + a + n, 0, len(pad) - n)                 # нужно max(pad[j : j+n]) = cen[j + n//2]
+    return cen[j + n // 2].astype(np.float32)
 
 
 def pwm_track(o, pwm):
@@ -136,6 +137,10 @@ def strand_features(o, lw, i, inr_here, inr_other, params):
     yield "inr_yr", v
     # --- дивергентный старт на другой цепи: индекс той же позиции генома в другой ориентации, окно +50..+300 ---
     yield "div_inr", window_max(inr_other, L - 1 - i, 50, 300, fill=-50.0)
+    # --- локальный контраст (шаг 3б): насколько эта позиция лучше соседей по Initiator ---
+    if params.get("local"):
+        for h in (3, 10, 25):
+            yield f"inr_vs_{h}", inr_here[i] - window_max(inr_here, i, -h, h, fill=-50.0)
     # --- мотивы: число вхождений начала мотива в окне ---
     hits = {}                                                     # одна дорожка на мотив, даже если окон несколько
     for name, (m, mm, a, b, _) in MOTIFS.items():
