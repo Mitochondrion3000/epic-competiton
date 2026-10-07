@@ -1,0 +1,169 @@
+"""Понятные признаки для каждой позиции-цепи, посчитанные только по последовательности ДНК.
+
+Используется в шагах 2-4 серии simple_model. Главная идея реализации: каждый признак считается как «дорожка» вдоль всего
+контига (одно число на каждую позицию), поэтому одну и ту же функцию можно применить и к 2.5 млн строк обучающей таблицы,
+и ко всем 72 млн позиций теста.
+
+Ориентация. Для цепи «−» работаем с обратно-комплементарной последовательностью контига. В ней позиция генома p имеет
+индекс L-1-p, а смещение +k по-прежнему означает «k нт ниже по течению (по ходу транскрипции)». Поэтому все окна ниже
+записаны в координатах транскрипции: отрицательные смещения это upstream (промотор), положительные это тело РНК.
+"""
+import numpy as np
+from scipy.ndimage import maximum_filter1d
+
+COMP = np.array([3, 2, 1, 0, 4], np.uint8)          # коды 0..4 = A,C,G,T,N; комплемент A<->T, C<->G
+IUPAC = {"A": "A", "C": "C", "G": "G", "T": "T", "R": "AG", "Y": "CT", "W": "AT", "S": "CG", "K": "GT", "M": "AC",
+         "B": "CGT", "D": "AGT", "H": "ACT", "V": "ACG", "N": "ACGT"}
+
+# ---------------------------------------------------------------------------------------------------------------------
+# Каталог признаков. motif: (последовательность IUPAC, допустимых несовпадений, окно начала мотива [a, b] относительно старта)
+# Окна выбраны по профилям обогащения в step2 (раздел 2): там видно, где именно мотив встречается чаще, чем в фоне.
+# ---------------------------------------------------------------------------------------------------------------------
+MOTIFS = {
+    "tata":        ("TATAWAWR", 0, -36, -25, "TATA-бокс: место посадки TBP, классически в −30"),
+    "ccaat":       ("CCAAT", 0, -150, -40, "CCAAT-бокс (фактор NF-Y), типичный элемент промотора выше старта"),
+    "ebox":        ("CACGTG", 0, -100, 20, "E-бокс: сайт факторов bHLH (Myc/Max, USF)"),
+    "cre":         ("TGACG", 0, -150, 20, "половина CRE (TGACGTCA): сайт факторов CREB/ATF"),
+    "trna_abox":   ("TRGCNNAGYNGG", 1, -50, 30, "A-бокс гена тРНК (промотор РНК-полимеразы III внутри гена)"),
+    "trna_bbox":   ("GGTTCGANTCC", 1, -10, 70, "B-бокс гена тРНК"),
+    "splice_down": ("GTRAGT", 0, 20, 300, "донорный сайт сплайсинга ниже старта: конец первого экзона"),
+    "polyAT_core": (None, 0, -60, 40, "участки AAAAAA/TTTTTT у самого старта (у стартов обеднены)"),
+    "polyAT_up":   (None, 0, -300, -120, "участки AAAAAA/TTTTTT далеко выше старта (у стартов обогащены)"),
+}
+# Состав в окне [a, b]: (что считаем, a, b, описание)
+COMPOSITION = {
+    "gc_core":   ("gc", -50, 50, "доля G+C вокруг старта"),
+    "gc_up":     ("gc", -300, -51, "доля G+C выше старта (промотор)"),
+    "gc_down":   ("gc", 51, 300, "доля G+C ниже старта (тело РНК)"),
+    "cpg_core":  ("cpg", -60, 60, "CpG наблюдаемое/ожидаемое вокруг старта (CpG-островок)"),
+    "cpg_down":  ("cpg", 120, 240, "CpG наблюдаемое/ожидаемое ниже старта"),
+    "rep_core":  ("low", -100, 100, "доля повторов (строчных букв) вокруг"),
+    "rep_here":  ("low", 0, 0, "сам старт внутри повтора"),
+}
+DESCRIPTIONS = {
+    "inr_pwm": "похожесть на Initiator: сумма log2(частота у стартов / фон) по буквам −5..+5",
+    "inr_yr":  "классический Inr: пиримидин (C/T) на −1 и пурин (A/G) на 0",
+    "div_inr": "дивергентный старт: лучший inr_pwm на противоположной цепи в 50–300 нт выше",
+    **{k: v[4] for k, v in MOTIFS.items()},
+    **{k: v[3] for k, v in COMPOSITION.items()},
+}
+GROUPS = {"сам старт": ["inr_pwm", "inr_yr"], "дивергентность": ["div_inr"],
+          "мотивы промотора": ["tata", "ccaat", "ebox", "cre"], "гены тРНК (Pol III)": ["trna_abox", "trna_bbox"],
+          "структура гена": ["splice_down"], "поли-A/T": ["polyAT_core", "polyAT_up"],
+          "состав": ["gc_core", "gc_up", "gc_down", "cpg_core", "cpg_down"], "повторы": ["rep_core", "rep_here"]}
+PWM_A, PWM_B = -5, 5
+
+
+def oriented(seq, low, strand):
+    """Последовательность (и маска повторов) по ходу транскрипции данной цепи."""
+    if strand == "+":
+        return seq, low
+    return COMP[seq[::-1]], low[::-1]
+
+
+def to_index(pos, L, strand):
+    """Позиция генома -> индекс в ориентированной последовательности."""
+    return pos if strand == "+" else L - 1 - pos
+
+
+def motif_hits(o, motif, mismatches=0):
+    """hit[j] = 1, если мотив (IUPAC) начинается в индексе j с не более чем `mismatches` несовпадениями."""
+    m = len(motif); L = len(o)
+    score = np.zeros(L, np.int8)
+    for k, ch in enumerate(motif):
+        ok = np.zeros(5, bool); ok[["ACGT".index(x) for x in IUPAC[ch]]] = True
+        score[:L - k] += ok[o[k:]]
+    hit = score >= m - mismatches
+    hit[L - m + 1:] = False
+    return hit
+
+
+def window_sum(track, idx, a, b):
+    """Сумма track[i+a .. i+b] для каждого i из idx (за краями контига считаем нули).
+    Через накопленную сумму: сумма в окне = c[конец] - c[начало], поэтому длина окна на скорость не влияет."""
+    c = np.zeros(len(track) + 1, np.int32 if track.dtype == bool else np.float64)
+    np.cumsum(track, dtype=c.dtype, out=c[1:])
+    lo = np.clip(idx + a, 0, len(track)); hi = np.clip(idx + b + 1, 0, len(track))
+    return c[hi] - c[lo]
+
+
+def window_max(track, idx, a, b, fill=0.0):
+    """Максимум track[i+a .. i+b] для каждого i из idx."""
+    n = b - a + 1
+    pad = np.concatenate([track, np.full(n, fill, track.dtype)])
+    cen = maximum_filter1d(pad, n, mode="nearest")            # окно с центром: cen[k] = max(pad[k - n//2 : k - n//2 + n])
+    j = idx + a                                               # нужно max(pad[j : j+n]) = cen[j + n//2]
+    out = np.full(len(idx), fill, np.float32)
+    ok = (j >= 0) & (j < len(track))
+    out[ok] = cen[j[ok] + n // 2]
+    return out
+
+
+def pwm_track(o, pwm):
+    """Счёт PWM (матрица 5 x W, смещения PWM_A..PWM_B) для каждого индекса как позиции старта."""
+    L = len(o); s = np.zeros(L, np.float32)
+    for k, off in enumerate(range(PWM_A, PWM_B + 1)):
+        v = pwm[:, k].astype(np.float32)[o]
+        if off >= 0: s[:L - off] += v[off:]
+        else:        s[-off:] += v[:L + off]
+    return s
+
+
+def fit_pwm(pos_windows, bg, pseudo=1.0):
+    """PWM из окон (n x W, коды 0..4) вокруг стартов: log2(частота буквы в колонке / фоновая частота). N даёт 0."""
+    cnt = np.stack([(pos_windows == b).sum(0) for b in range(4)]).astype(float)
+    f = (cnt + pseudo) / (cnt.sum(0) + 4 * pseudo)
+    pwm = np.zeros((5, pos_windows.shape[1])); pwm[:4] = np.log2(f / np.asarray(bg)[:, None])
+    return pwm
+
+
+def contig_features(seq, low, positions, strands, params):
+    """Все признаки для позиций одного контига. positions: позиции генома, strands: массив '+'/'-'.
+    params: {'pwm': 5 x W, 'kmers': [(имя, a, b), ...]} — то, что выучено на fit-части (шаг 2)."""
+    L = len(seq)
+    out = {}
+    tracks = {}
+    for st in ("+", "-"):                                         # дорожки, которые нужны для противоположной цепи
+        o, _ = oriented(seq, low, st)
+        tracks[st] = pwm_track(o, params["pwm"])
+    rows_all = np.arange(len(positions))
+    for st in ("+", "-"):
+        sel = rows_all[strands == st]
+        if len(sel) == 0: continue
+        o, lw = oriented(seq, low, st)
+        i = to_index(positions[sel], L, st)
+        f = {}
+        # --- сам старт ---
+        f["inr_pwm"] = tracks[st][i]
+        ok = (i >= 1)
+        f["inr_yr"] = np.zeros(len(i), np.float32)
+        f["inr_yr"][ok] = ((o[i[ok] - 1] == 1) | (o[i[ok] - 1] == 3)) & ((o[i[ok]] == 0) | (o[i[ok]] == 2))
+        # --- дивергентный старт на другой цепи: индекс той же позиции генома в другой ориентации, окно +50..+300 ---
+        other = "-" if st == "+" else "+"
+        f["div_inr"] = window_max(tracks[other], L - 1 - i, 50, 300, fill=-50.0)
+        # --- мотивы: число вхождений начала мотива в окне ---
+        hits = {}                                                 # одна дорожка на мотив, даже если окон несколько
+        for name, (m, mm, a, b, _) in MOTIFS.items():
+            if (m, mm) not in hits:
+                hits[m, mm] = (motif_hits(o, "AAAAAA") | motif_hits(o, "TTTTTT")) if m is None else motif_hits(o, m, mm)
+            f[name] = window_sum(hits[m, mm], i, a, b)
+        del hits
+        # --- состав ---
+        valid = o < 4
+        gc = (o == 1) | (o == 2)
+        cg = np.zeros(L, bool); cg[:-1] = (o[:-1] == 1) & (o[1:] == 2)          # динуклеотид CpG начинается здесь
+        for name, (kind, a, b, _) in COMPOSITION.items():
+            if kind == "gc":
+                f[name] = window_sum(gc, i, a, b) / np.maximum(window_sum(valid, i, a, b), 1)
+            elif kind == "low":
+                f[name] = window_sum(lw, i, a, b) / (b - a + 1)
+            else:                                                 # CpG наблюдаемое / ожидаемое = n(CG) * n / (n(C) * n(G))
+                n = np.maximum(window_sum(valid, i, a, b), 1)
+                nc, ng = window_sum(o == 1, i, a, b), window_sum(o == 2, i, a, b)
+                f[name] = window_sum(cg, i, a, b) * n / np.maximum(nc * ng, 1)
+        # --- k-меры, найденные по данным (шаг 2, раздел 4) ---
+        for name, a, b in params.get("kmers", []):
+            f[f"kmer_{name}"] = window_sum(motif_hits(o, name), i, a, b)
+        for k, v in f.items():
+            out.setdefault(k, np.zeros(len(positions), np.float32))[sel] = v
+    return out
