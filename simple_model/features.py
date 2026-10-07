@@ -117,53 +117,62 @@ def fit_pwm(pos_windows, bg, pseudo=1.0):
     return pwm
 
 
-def contig_features(seq, low, positions, strands, params):
+def strand_features(o, lw, i, inr_here, inr_other, params):
+    """Признаки для индексов i ориентированной последовательности o одной цепи; по одному признаку за раз
+    (генератор пар (имя, значения)), чтобы не держать в памяти все дорожки сразу.
+    inr_here / inr_other: дорожки inr_pwm этой и противоположной цепи (нужны для дивергентного старта)."""
+    from motifs import score_track
+    L = len(o)
+    # --- сам старт ---
+    yield "inr_pwm", inr_here[i]
+    v = np.zeros(len(i), np.float32); ok = i >= 1
+    v[ok] = ((o[i[ok] - 1] == 1) | (o[i[ok] - 1] == 3)) & ((o[i[ok]] == 0) | (o[i[ok]] == 2))
+    yield "inr_yr", v
+    # --- дивергентный старт на другой цепи: индекс той же позиции генома в другой ориентации, окно +50..+300 ---
+    yield "div_inr", window_max(inr_other, L - 1 - i, 50, 300, fill=-50.0)
+    # --- мотивы: число вхождений начала мотива в окне ---
+    hits = {}                                                     # одна дорожка на мотив, даже если окон несколько
+    for name, (m, mm, a, b, _) in MOTIFS.items():
+        if (m, mm) not in hits:
+            hits[m, mm] = (motif_hits(o, "AAAAAA") | motif_hits(o, "TTTTTT")) if m is None else motif_hits(o, m, mm)
+        yield name, window_sum(hits[m, mm], i, a, b)
+    del hits
+    # --- состав ---
+    valid = o < 4
+    gc = (o == 1) | (o == 2)
+    cg = np.zeros(L, bool); cg[:-1] = (o[:-1] == 1) & (o[1:] == 2)              # динуклеотид CpG начинается здесь
+    for name, (kind, a, b, _) in COMPOSITION.items():
+        if kind == "gc":
+            yield name, window_sum(gc, i, a, b) / np.maximum(window_sum(valid, i, a, b), 1)
+        elif kind == "low":
+            yield name, window_sum(lw, i, a, b) / (b - a + 1)
+        else:                                                     # CpG наблюдаемое / ожидаемое = n(CG) * n / (n(C) * n(G))
+            n = np.maximum(window_sum(valid, i, a, b), 1)
+            nc, ng = window_sum(o == 1, i, a, b), window_sum(o == 2, i, a, b)
+            yield name, window_sum(cg, i, a, b) * n / np.maximum(nc * ng, 1)
+    # --- k-меры, найденные по данным (шаг 2, раздел 3) ---
+    for name, a, b in params.get("kmers", []):
+        yield f"kmer_{name}", window_sum(motif_hits(o, name), i, a, b)
+    # --- мотивы факторов транскрипции из JASPAR/HOCOMOCO (шаг 3): число сайтов с счётом >= порога в окне ---
+    for m in params.get("tf", []):
+        hit = score_track(o, np.asarray(m["pwm"], np.float32)) >= m["thr"]
+        yield f"tf_{m['name']}", window_sum(hit, i, m["a"], m["b"])
+
+
+def contig_features(seq, low, positions, strands, params, only=None):
     """Все признаки для позиций одного контига. positions: позиции генома, strands: массив '+'/'-'.
-    params: {'pwm': 5 x W, 'kmers': [(имя, a, b), ...]} — то, что выучено на fit-части (шаг 2)."""
+    params: {'pwm': 5 x W, 'kmers': [(имя, a, b), ...], 'tf': [...]} — то, что выучено на fit-части.
+    only: если задан список имён, возвращаем только эти признаки (остальные всё равно считаются, это просто фильтр)."""
     L = len(seq)
     out = {}
-    tracks = {}
-    for st in ("+", "-"):                                         # дорожки, которые нужны для противоположной цепи
-        o, _ = oriented(seq, low, st)
-        tracks[st] = pwm_track(o, params["pwm"])
+    inr = {st: pwm_track(oriented(seq, low, st)[0], params["pwm"]) for st in ("+", "-")}
     rows_all = np.arange(len(positions))
     for st in ("+", "-"):
         sel = rows_all[strands == st]
         if len(sel) == 0: continue
         o, lw = oriented(seq, low, st)
         i = to_index(positions[sel], L, st)
-        f = {}
-        # --- сам старт ---
-        f["inr_pwm"] = tracks[st][i]
-        ok = (i >= 1)
-        f["inr_yr"] = np.zeros(len(i), np.float32)
-        f["inr_yr"][ok] = ((o[i[ok] - 1] == 1) | (o[i[ok] - 1] == 3)) & ((o[i[ok]] == 0) | (o[i[ok]] == 2))
-        # --- дивергентный старт на другой цепи: индекс той же позиции генома в другой ориентации, окно +50..+300 ---
-        other = "-" if st == "+" else "+"
-        f["div_inr"] = window_max(tracks[other], L - 1 - i, 50, 300, fill=-50.0)
-        # --- мотивы: число вхождений начала мотива в окне ---
-        hits = {}                                                 # одна дорожка на мотив, даже если окон несколько
-        for name, (m, mm, a, b, _) in MOTIFS.items():
-            if (m, mm) not in hits:
-                hits[m, mm] = (motif_hits(o, "AAAAAA") | motif_hits(o, "TTTTTT")) if m is None else motif_hits(o, m, mm)
-            f[name] = window_sum(hits[m, mm], i, a, b)
-        del hits
-        # --- состав ---
-        valid = o < 4
-        gc = (o == 1) | (o == 2)
-        cg = np.zeros(L, bool); cg[:-1] = (o[:-1] == 1) & (o[1:] == 2)          # динуклеотид CpG начинается здесь
-        for name, (kind, a, b, _) in COMPOSITION.items():
-            if kind == "gc":
-                f[name] = window_sum(gc, i, a, b) / np.maximum(window_sum(valid, i, a, b), 1)
-            elif kind == "low":
-                f[name] = window_sum(lw, i, a, b) / (b - a + 1)
-            else:                                                 # CpG наблюдаемое / ожидаемое = n(CG) * n / (n(C) * n(G))
-                n = np.maximum(window_sum(valid, i, a, b), 1)
-                nc, ng = window_sum(o == 1, i, a, b), window_sum(o == 2, i, a, b)
-                f[name] = window_sum(cg, i, a, b) * n / np.maximum(nc * ng, 1)
-        # --- k-меры, найденные по данным (шаг 2, раздел 4) ---
-        for name, a, b in params.get("kmers", []):
-            f[f"kmer_{name}"] = window_sum(motif_hits(o, name), i, a, b)
-        for k, v in f.items():
-            out.setdefault(k, np.zeros(len(positions), np.float32))[sel] = v
+        for k, v in strand_features(o, lw, i, inr[st], inr["-" if st == "+" else "+"], params):
+            if only is None or k in only:
+                out.setdefault(k, np.zeros(len(positions), np.float32))[sel] = v
     return out
