@@ -19,8 +19,9 @@ Epic Autosome competition - Large Milkweed Bug leaderboard
 |---|---|---|
 | 1 | `simple_model/step1_data_table.ipynb` | чтение данных, «позиция-цепь» и ориентация, валидационные контиги, таблица строк (все старты + случайные отрицательные), первый взгляд на сигнал (динуклеотид на старте, GC) |
 | 2 | `simple_model/step2_features.ipynb` + `simple_model/features.py` | 27 признаков из последовательности (Initiator, TATA, CCAAT, E-бокс, CRE, боксы тРНК, донор сплайсинга, поли-A/T, GC, CpG, повторы, найденные 6-меры); профили мотивов вокруг стартов; полезность каждого признака по отдельности |
+| 3 | `simple_model/step3_motif_db_and_model.ipynb` + `simple_model/motifs.py` | скрининг 2805 мотивов JASPAR 2024 / HOCOMOCO v12 (YY1, TAF1, NF-Y, CREB/ATF, AP-1…), подписи k-меров, широкий контекст ±1 т.н., три модели (логистическая регрессия, аддитивная, деревья глубины 3), кривые влияния признаков, разбор ошибок. Валидация: AUPRC 0.020 (×27 случайного), Spearman 0.32 |
 
-Открыть в Colab: [шаг 1](https://colab.research.google.com/github/Mitochondrion3000/epic-competiton/blob/claude/gracious-brown-4ybsmj/simple_model/step1_data_table.ipynb), [шаг 2](https://colab.research.google.com/github/Mitochondrion3000/epic-competiton/blob/claude/gracious-brown-4ybsmj/simple_model/step2_features.ipynb) (CPU достаточно; шаг 2 читает таблицу, сохранённую шагом 1 на Google Диск)
+Открыть в Colab: [шаг 1](https://colab.research.google.com/github/Mitochondrion3000/epic-competiton/blob/claude/gracious-brown-4ybsmj/simple_model/step1_data_table.ipynb), [шаг 2](https://colab.research.google.com/github/Mitochondrion3000/epic-competiton/blob/claude/gracious-brown-4ybsmj/simple_model/step2_features.ipynb), [шаг 3](https://colab.research.google.com/github/Mitochondrion3000/epic-competiton/blob/claude/gracious-brown-4ybsmj/simple_model/step3_motif_db_and_model.ipynb) (CPU достаточно; каждый шаг читает то, что предыдущий сохранил на Google Диск)
 
 ## Как запустить v2
 
