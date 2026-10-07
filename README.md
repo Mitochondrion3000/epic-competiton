@@ -11,6 +11,16 @@ Epic Autosome competition - Large Milkweed Bug leaderboard
 
 [Открыть v2 в Colab](https://colab.research.google.com/github/Mitochondrion3000/epic-competiton/blob/main/epic_v2_model.ipynb)
 
+## Простая интерпретируемая модель (папка `simple_model/`)
+
+Пошаговая серия: понятные биологические признаки из последовательности → таблица → простая модель.
+
+| шаг | ноутбук | что внутри |
+|---|---|---|
+| 1 | `simple_model/step1_data_table.ipynb` | чтение данных, «позиция-цепь» и ориентация, валидационные контиги, таблица строк (все старты + случайные отрицательные), первый взгляд на сигнал (динуклеотид на старте, GC) |
+
+[Открыть шаг 1 в Colab](https://colab.research.google.com/github/Mitochondrion3000/epic-competiton/blob/claude/gracious-brown-4ybsmj/simple_model/step1_data_table.ipynb) (CPU достаточно)
+
 ## Как запустить v2
 
 1. Colab → Runtime → Change runtime type → GPU (лучше L4 или A100), для `Ofas_2.0` включить High-RAM.
