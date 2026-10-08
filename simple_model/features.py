@@ -213,3 +213,24 @@ def feature_matrix(seq, low, positions, strands, params, names):
         for k, v in strand_features(o, lw, i, inr[st], inr["-" if st == "+" else "+"], params):
             if k in col: X[sel, col[k]] = v
     return X
+
+
+LOGO_A, LOGO_B = -50, 30
+
+
+def logo_names(a=LOGO_A, b=LOGO_B):
+    """Имена признаков-логотипа: буква X на смещении k от старта (по ходу транскрипции), например 'b-1_C', 'b+0_A'."""
+    return [f"b{o:+d}_{'ACGT'[x]}" for o in range(a, b + 1) for x in range(4)]
+
+
+def logo_onehot(seq, positions, strand, a=LOGO_A, b=LOGO_B):
+    """Позиционный «логотип»: для каждой позиции one-hot буквы на смещениях a..b по ходу транскрипции (uint8, n x 4*(b-a+1)).
+    Считается без дорожек, поэтому его легко собирать кусками прямо перед предсказанием."""
+    off = np.arange(a, b + 1)
+    g = positions[:, None] + (off if strand == "+" else -off)[None, :]
+    ok = (g >= 0) & (g < len(seq))
+    code = np.where(ok, seq[np.where(ok, g, 0)], 4)
+    if strand == "-": code = COMP[code]
+    out = np.zeros((len(positions), len(off), 4), np.uint8)
+    for x in range(4): out[:, :, x] = code == x
+    return out.reshape(len(positions), -1)
