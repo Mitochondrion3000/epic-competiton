@@ -45,8 +45,8 @@ P = json.load(open(f"{OUT}/Ofas_2.0.step3b_params.json"))
 FE = P["features"]; PARAMS = {"pwm": np.array(P["pwm"]), "kmers": [tuple(k) for k in P["kmers"]], "tf": P["tf"], "wide": True, "local": True}
 LOGO = F.logo_names(); ALL = FE + LOGO
 
-def featurize(species, df):
-    seq, low = read_genome(f"{DATA}/{species}/genome/genome.fa.gz", set(df.chrom))
+def featurize(species, df, extra_contigs=()):
+    seq, low = read_genome(f"{DATA}/{species}/genome/genome.fa.gz", set(df.chrom) | set(extra_contigs))   # + контиги плотной валидации
     X = np.zeros((len(df), len(ALL)), np.float32); df = df.reset_index(drop=True)
     for c, d in df.groupby("chrom", sort=False):
         r = d.index.values
@@ -62,7 +62,7 @@ def sample(table, n_pos, n_neg, split):
 
 ofas = pd.read_parquet(f"{OUT}/Ofas_2.0.step1_table.parquet"); meta = json.load(open(f"{OUT}/Ofas_2.0.step1_meta.json"))
 plod = pd.read_parquet(f"{OUT}/ilPloInte3.2.step1_table.parquet")
-Xo, do, SEQ, LOW = featurize("Ofas_2.0", sample(ofas, 400_000, 1_000_000, ["fit"])); log("признаки клопа", Xo.shape)
+Xo, do, SEQ, LOW = featurize("Ofas_2.0", sample(ofas, 400_000, 1_000_000, ["fit"]), meta["VAL_CONTIGS"]); log("признаки клопа", Xo.shape)
 Xp, dp, _, _ = featurize("ilPloInte3.2", sample(plod, 400_000, 1_000_000, ["fit", "val"])); log("признаки огнёвки", Xp.shape)
 
 # плотная валидация клопа (как в шаге 3б): первые половины val-контигов до ~3 млн позиций-цепей (память)
@@ -81,6 +81,7 @@ for c in meta["VAL_CONTIGS"]:
         dense.append((X, np.array([tot.get(k, 0.0) for k in (dpos * 2 + (st == "-")).tolist()], np.float32)))
     n += 2 * len(dpos)
     if n >= 3_000_000: break
+assert dense, "плотная валидация пуста: val-контиги не загружены"
 DY = np.concatenate([d[1] for d in dense]); log("плотная валидация", len(DY), "стартов", int((DY > 0).sum()))
 
 KW = dict(objective="binary", max_depth=6, num_leaves=64, learning_rate=0.05, min_data_in_leaf=200, bagging_fraction=0.8, bagging_freq=1, feature_fraction=0.8, verbose=-1, seed=0)
