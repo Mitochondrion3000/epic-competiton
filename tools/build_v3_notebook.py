@@ -49,6 +49,8 @@ if DEVICE == "cuda":
 else:
     AMP_DTYPE = None
     print("GPU нет: на CPU годится только проверка кода (EPIC_FAST_DEV=1)")
+    if os.environ.get("EPIC_FAST_DEV") != "1":
+        raise RuntimeError("GPU не найден. Kaggle: Settings ноутбука -> Accelerator = GPU T4 x2 (нужен подтверждённый телефон)")
 
 def autocast():
     return torch.autocast("cuda", dtype=AMP_DTYPE) if AMP_DTYPE is not None else contextlib.nullcontext()
