@@ -111,25 +111,40 @@ display(pd.Series({k: str(v) for k, v in CFG.items()}, name="значение").
 ''')
 
 code(r'''
-# 1.3 Скачивание архивов видов с Zenodo (doi:10.5281/zenodo.22285753), проверка MD5
+# 1.3 Архивы видов: из Input (/kaggle/input/**/<вид>.tgz, например датасет espernauto/epic-kittens) или с Zenodo
+#     (doi:10.5281/zenodo.22285753); в обоих случаях MD5 сверяется с суммами Zenodo
+ZENODO_MD5 = {"jaNemVect1.1": "733dccb6393a3c07b6e0d7ffaed3686f", "ASM119413v2": "108050274a2370f095ad508d62f5cde4",
+              "Ofas_2.0": "c785a4b14346501d77e22ff645c511e9", "cgigas_uk_roslin_v1": "661e2c4d4e0378eddbb46bdc555110ef",
+              "sSquSuc5.hap2": "3e4ae5b2f8f45b3a41d78b4c87eed5d2", "ilPloInte3.2": "b0317e9e686699089665616d3b87d3fa"}
+
+def md5_file(path):
+    h = hashlib.md5()
+    with open(path, "rb") as fh:
+        for chunk in iter(lambda: fh.read(1 << 24), b""): h.update(chunk)
+    return h.hexdigest()
+
 def download_dataset(species, data_dir):
     if glob.glob(f"{data_dir}/{species}*/for_participants"):
         print("уже распакован:", species); return
-    import requests
     os.makedirs(data_dir, exist_ok=True)
-    rec = requests.get("https://zenodo.org/api/records/22285753", timeout=60).json()
-    f = [x for x in rec["files"] if x["key"] == f"{species}.tgz"][0]
-    dst = f"{data_dir}/{species}.tgz"; md5 = hashlib.md5()
-    with requests.get(f["links"]["self"], stream=True, timeout=120) as r, open(dst, "wb") as fh:
-        r.raise_for_status()
-        for chunk in tqdm(r.iter_content(1 << 22), total=f["size"] // (1 << 22) + 1, desc=f"скачиваю {species}", unit="×4МБ"):
-            fh.write(chunk); md5.update(chunk)
-    want = f.get("checksum", "md5:").split(":")[-1]
-    assert not want or md5.hexdigest() == want, f"MD5 не совпал для {species}"
-    with tarfile.open(dst) as tf:
+    local = sorted(glob.glob(f"/kaggle/input/**/{species}.tgz", recursive=True))
+    if local:
+        src = local[0]; print("архив из Input:", src)
+    else:
+        import requests
+        rec = requests.get("https://zenodo.org/api/records/22285753", timeout=60).json()
+        f = [x for x in rec["files"] if x["key"] == f"{species}.tgz"][0]
+        src = f"{data_dir}/{species}.tgz"
+        with requests.get(f["links"]["self"], stream=True, timeout=120) as r, open(src, "wb") as fh:
+            r.raise_for_status()
+            for chunk in tqdm(r.iter_content(1 << 22), total=f["size"] // (1 << 22) + 1, desc=f"скачиваю {species}", unit="×4МБ"):
+                fh.write(chunk)
+    got = md5_file(src)
+    assert got == ZENODO_MD5[species], f"MD5 архива {species} не совпал с Zenodo: {got}"
+    with tarfile.open(src) as tf:
         try: tf.extractall(data_dir, filter="data")
         except TypeError: tf.extractall(data_dir)
-    os.remove(dst)
+    if not local: os.remove(src)
 
 BASES = {}
 for sp in SPECIES:
