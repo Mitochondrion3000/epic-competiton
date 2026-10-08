@@ -234,3 +234,25 @@ def logo_onehot(seq, positions, strand, a=LOGO_A, b=LOGO_B):
     out = np.zeros((len(positions), len(off), 4), np.uint8)
     for x in range(4): out[:, :, x] = code == x
     return out.reshape(len(positions), -1)
+
+
+DINUC_A, DINUC_B = -5, 30
+
+
+def dinuc_names(a=DINUC_A, b=DINUC_B):
+    """Имена признаков «пара букв»: динуклеотид XY, начинающийся на смещении k (например 'd-1_CA' — C на −1 и A на 0)."""
+    return [f"d{o:+d}_{'ACGT'[x // 4]}{'ACGT'[x % 4]}" for o in range(a, b + 1) for x in range(16)]
+
+
+def dinuc_onehot(seq, positions, strand, a=DINUC_A, b=DINUC_B):
+    """Пары соседних букв на смещениях a..b по ходу транскрипции, one-hot (uint8, n x 16*(b-a+1))."""
+    off = np.arange(a, b + 2)
+    g = positions[:, None] + (off if strand == "+" else -off)[None, :]
+    ok = (g >= 0) & (g < len(seq))
+    code = np.where(ok, seq[np.where(ok, g, 0)], 4)
+    if strand == "-": code = COMP[code]
+    c1, c2 = code[:, :-1], code[:, 1:]
+    pair = np.where((c1 < 4) & (c2 < 4), c1 * 4 + c2, 16)
+    out = np.zeros((len(positions), b - a + 1, 16), np.uint8)
+    for x in range(16): out[:, :, x] = pair == x
+    return out.reshape(len(positions), -1)
