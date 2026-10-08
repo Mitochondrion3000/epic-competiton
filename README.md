@@ -22,8 +22,9 @@ Epic Autosome competition - Large Milkweed Bug leaderboard
 | 3 | `simple_model/step3_motif_db_and_model.ipynb` + `simple_model/motifs.py` | скрининг 2805 мотивов JASPAR 2024 / HOCOMOCO v12 (YY1, TAF1, NF-Y, CREB/ATF, AP-1…), подписи k-меров, широкий контекст ±1 т.н., три модели (логистическая регрессия, аддитивная, деревья глубины 3), кривые влияния признаков, разбор ошибок. Валидация: AUPRC 0.020 (×27 случайного), Spearman 0.32 |
 | 3б | `simple_model/step3b_positional.ipynb` + `simple_model/scoring.py` | плотная валидация (все позиции подряд, официальные метрики), окна пиков для каждого фактора (YY1 −2..+15, NF-Y −112..−43…), локальный контраст Initiator, подбор квантования сабмита. AUPRC на плотной валидации 0.017 → 0.025 |
 | 4 | `simple_model/step4_test_and_submission.ipynb` | предсказание 72.6 млн позиций теста, официальные метрики, участки генома глазами, файл сабмита. **Тест Nematostella: AUPRC 0.020, Spearman 0.196** (бейзлайн организаторов 0.0012 / 0.036, лучшая CNN 0.132 / 0.391) |
+| 5 | `simple_model/step5_logo.ipynb` | позиционный «логотип» (буква на каждом смещении −50..+30, 324 признака) + 61 признак, деревья глубины 6, картинка важности позиций, тест и сабмит. **Тест Nematostella: AUPRC 0.029, Spearman 0.274** (+45% / +40% к шагу 4) |
 
-Открыть в Colab: [шаг 1](https://colab.research.google.com/github/Mitochondrion3000/epic-competiton/blob/claude/gracious-brown-4ybsmj/simple_model/step1_data_table.ipynb), [шаг 2](https://colab.research.google.com/github/Mitochondrion3000/epic-competiton/blob/claude/gracious-brown-4ybsmj/simple_model/step2_features.ipynb), [шаг 3](https://colab.research.google.com/github/Mitochondrion3000/epic-competiton/blob/claude/gracious-brown-4ybsmj/simple_model/step3_motif_db_and_model.ipynb), [шаг 3б](https://colab.research.google.com/github/Mitochondrion3000/epic-competiton/blob/claude/gracious-brown-4ybsmj/simple_model/step3b_positional.ipynb), [шаг 4](https://colab.research.google.com/github/Mitochondrion3000/epic-competiton/blob/claude/gracious-brown-4ybsmj/simple_model/step4_test_and_submission.ipynb) (CPU достаточно; каждый шаг читает то, что предыдущий сохранил на Google Диск)
+Открыть в Colab: [шаг 1](https://colab.research.google.com/github/Mitochondrion3000/epic-competiton/blob/claude/gracious-brown-4ybsmj/simple_model/step1_data_table.ipynb), [шаг 2](https://colab.research.google.com/github/Mitochondrion3000/epic-competiton/blob/claude/gracious-brown-4ybsmj/simple_model/step2_features.ipynb), [шаг 3](https://colab.research.google.com/github/Mitochondrion3000/epic-competiton/blob/claude/gracious-brown-4ybsmj/simple_model/step3_motif_db_and_model.ipynb), [шаг 3б](https://colab.research.google.com/github/Mitochondrion3000/epic-competiton/blob/claude/gracious-brown-4ybsmj/simple_model/step3b_positional.ipynb), [шаг 4](https://colab.research.google.com/github/Mitochondrion3000/epic-competiton/blob/claude/gracious-brown-4ybsmj/simple_model/step4_test_and_submission.ipynb), [шаг 5](https://colab.research.google.com/github/Mitochondrion3000/epic-competiton/blob/claude/gracious-brown-4ybsmj/simple_model/step5_logo.ipynb) (CPU достаточно; каждый шаг читает то, что предыдущий сохранил на Google Диск)
 
 ## Как запустить v2
 
@@ -40,3 +41,8 @@ Epic Autosome competition - Large Milkweed Bug leaderboard
 ноутбук сам найдёт чекпоинты в `/kaggle/input`. Подробности в разделе 6 ноутбука.
 
 Для проверки кода без GPU: `EPIC_FAST_DEV=1` ставит крошечные настройки (несколько минут на CPU).
+
+### Запуск на Kaggle (CPU)
+
+`kaggle/ofas_a` (шаги 1–3) → `kaggle/ofas_b` (шаг 3б) → `kaggle/ofas_c` (шаг 5: логотип, тест, сабмит). Каждый скрипт клонирует
+эту ветку, берёт результаты предыдущего ноутбука как вход и пишет свои в `/kaggle/working`. Отправка: `kaggle kernels push -p kaggle/ofas_a`.
