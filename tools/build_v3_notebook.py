@@ -63,7 +63,8 @@ AUX = [s for s in os.environ.get("EPIC_AUX", "ilPloInte3.2,cgigas_uk_roslin_v1,j
 SPECIES = [TARGET] + AUX                                                  # индекс 0 = целевой вид (его головы идут в сабмит)
 FAST_DEV = os.environ.get("EPIC_FAST_DEV") == "1"
 SESSION_T0 = time.time()
-TAG = "v3bp"
+TAG = os.environ.get("EPIC_TAG", "v3bp")   # префикс файлов весов; новый TAG = новый прогон обучения
+USE_GT_TEST = os.environ.get("EPIC_USE_GT_TEST", "1") == "1"   # тест вспомогательного вида с открытыми ответами (Nematostella) -> в обучение
 # EPIC_CKPT_FROM: взять готовые веса, обученные для другого целевого вида (например Ofas_2.0, где моль и устрица были
 # вспомогательными), и предсказать TARGET его собственными головами. Обучения при этом нет
 CKPT_FROM = os.environ.get("EPIC_CKPT_FROM", TARGET)
@@ -98,7 +99,8 @@ CFG = dict(
     CH=256, N_LAYERS=9, STEM_K=21, PROF_K=75,
     COUNT_WEIGHT=1.0,         # вес MSE головы счёта относительно кросс-энтропии профиля
     # --- обучение ---
-    STEPS=30000, BATCH=32, LR=1e-3, WEIGHT_DECAY=1e-2, WARMUP=0.05,
+    STEPS=30000, BATCH=32, LR=float(os.environ.get("EPIC_LR", "5e-4")),   # 1e-3 в прогоне 2026-10-08: seed0 разошёлся
+    WEIGHT_DECAY=1e-2, WARMUP=0.05,
     DIVERGE_FRAC=0.5, EMA_DECAY=0.999,
     EVAL_EVERY=2000, EVAL_BP=4_000_000,
     N_SEEDS=2, CKPT_EVERY=1000,
@@ -204,6 +206,19 @@ def load_species(sp, with_test):
     fp = f"{BASES[sp]}/for_participants"
     wl = read_bed(f"{fp}/whitelist.train.bed.gz", 3)
     tpl = read_bed(f"{fp}/template.test.bed.gz", 6) if with_test else None
+    # вспомогательный вид с открытыми ответами теста (Nematostella): тест тоже идёт в обучение (правилами разрешено)
+    gt_path = f"{BASES[sp]}/ground_truth/csRNA-test.txt.gz"
+    extra = None
+    if not with_test and USE_GT_TEST and os.path.exists(gt_path):
+        tg = read_bed(f"{fp}/template.test.bed.gz", 6)
+        gt = pd.read_csv(gt_path, header=None, dtype=np.float32)[0].values
+        off = np.r_[0, np.cumsum((tg.end - tg.start).values)]
+        assert off[-1] == len(gt), f"{sp}: длина ответов теста не совпала с шаблоном"
+        nz = np.flatnonzero(gt > 0); k = np.searchsorted(off, nz, side="right") - 1
+        extra = pd.DataFrame({"chrom": tg.chrom.values[k], "pos": tg.start.values[k] + (nz - off[k]),
+                              "strand": (tg.strand.values[k] == "-").astype(np.int8), "tot": gt[nz]})
+        wl = pd.concat([wl, tg[["chrom", "start", "end"]].drop_duplicates()], ignore_index=True)
+        print(f"{sp}: + тест с ответами: {tg.chrom.nunique()} контигов, {len(extra):,} положительных позиций-цепей")
     train_c = list(dict.fromkeys(wl.chrom))
     test_c = list(dict.fromkeys(tpl.chrom)) if with_test else []
     genome = read_genome(f"{BASES[sp]}/genome/genome.fa.gz", set(train_c) | set(test_c))
@@ -221,6 +236,7 @@ def load_species(sp, with_test):
         lab = r if lab is None else lab.merge(r, on=["chrom", "pos", "strand"], how="outer")
     rep_cols = [f"r{i}" for i in range(len(files))]
     lab["tot"] = lab[rep_cols].fillna(0).sum(axis=1).astype(np.float32)
+    if extra is not None: lab = pd.concat([lab[["chrom", "pos", "strand", "tot"]], extra], ignore_index=True)
     track = {}
     for c, d in lab.groupby("chrom", sort=False):
         d = d.sort_values(["pos", "strand"])
