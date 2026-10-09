@@ -242,33 +242,43 @@ display(pd.DataFrame(info).T)
 ''')
 
 md(r'''
-## 3. Отложенные контиги целевого вида: `tune` и `report`
+## 3. Отложенные контиги каждого вида: `tune` и `report`
 
-Тот же жадный алгоритм и те же настройки, что в v2, поэтому группы совпадают с группами v2 (это проверяется при смешивании).
-У вспомогательных видов в обучение идут все train-контиги.
+Тот же жадный алгоритм и те же настройки, что в v2, поэтому у целевого вида группы совпадают с группами v2 (это проверяется при смешивании).
+Группы откладываются **у каждого вида**, не только у целевого: тогда веса этого прогона можно честно проверить и на вспомогательном виде
+(режим `EPIC_CKPT_FROM`). В прогоне 2026-10-08 вспомогательные виды учились на всех своих контигах, и report моли/устрицы был завышен.
 ''')
 code(r'''
-# 3.1 Группы tune и report (копия v2)
-wl_bp = (T["wl"].assign(bp=T["wl"].end - T["wl"].start).groupby("chrom", sort=False).bp.sum())
-pos_n = pd.Series({c: len(T["track"][c]["pos"]) if c in T["track"] else 0 for c in wl_bp.index})
-GLOBAL_RATE = pos_n.sum() / (2 * wl_bp.sum())
+# 3.1 Группы tune и report для каждого вида (алгоритм v2)
+def make_groups(ds, frac):
+    wl_bp = (ds["wl"].assign(bp=ds["wl"].end - ds["wl"].start).groupby("chrom", sort=False).bp.sum())
+    pos_n = pd.Series({c: len(ds["track"][c]["pos"]) if c in ds["track"] else 0 for c in wl_bp.index})
+    rate = pos_n.sum() / (2 * wl_bp.sum())
+    def pick_group(avail, target_bp):
+        sel, s_bp, s_pos = [], 0, 0
+        while s_bp < target_bp and avail:
+            best = min(avail, key=lambda c: abs((s_pos + pos_n[c]) / (2 * (s_bp + wl_bp[c])) - rate))
+            sel.append(best); s_bp += wl_bp[best]; s_pos += pos_n[best]; avail.remove(best)
+        return sel
+    min_bp = max(min(100_000, int(wl_bp.max())), int(wl_bp.sum()) // 1000)
+    avail = [c for c in wl_bp.index if wl_bp[c] >= min_bp]
+    return {g: pick_group(avail, frac * wl_bp.sum()) for g in ("tune", "report")}, wl_bp, pos_n
 
-def pick_group(avail, target_bp):
-    sel, s_bp, s_pos = [], 0, 0
-    while s_bp < target_bp and avail:
-        best = min(avail, key=lambda c: abs((s_pos + pos_n[c]) / (2 * (s_bp + wl_bp[c])) - GLOBAL_RATE))
-        sel.append(best); s_bp += wl_bp[best]; s_pos += pos_n[best]; avail.remove(best)
-    return sel
-
-min_bp = max(min(100_000, int(wl_bp.max())), int(wl_bp.sum()) // 1000)
-avail = [c for c in wl_bp.index if wl_bp[c] >= min_bp]
-GROUPS = {g: pick_group(avail, CFG["HOLDOUT_FRAC"] * wl_bp.sum()) for g in ("tune", "report")}
-HELD = set(GROUPS["tune"]) | set(GROUPS["report"])
-FIT = {sp: (DS[sp]["train"] if sp != TARGET else [c for c in T["train"] if c not in HELD]) for sp in SPECIES}
+GROUPS_ALL, FIT = {}, {}
+for sp in SPECIES:
+    GROUPS_ALL[sp], wl_bp_sp, _ = make_groups(DS[sp], CFG["HOLDOUT_FRAC"])
+    held = set(GROUPS_ALL[sp]["tune"]) | set(GROUPS_ALL[sp]["report"])
+    FIT[sp] = [c for c in DS[sp]["train"] if c not in held]
+GROUPS, wl_bp, pos_n = make_groups(T, CFG["HOLDOUT_FRAC"])
+assert GROUPS == GROUPS_ALL[TARGET]
 json.dump(GROUPS, open(f"{OUT_DIR}/holdout_groups.json", "w"))
+json.dump(GROUPS_ALL, open(f"{OUT_DIR}/holdout_groups_all.json", "w"))
 display(pd.DataFrame({g: {"контигов": len(cs), "Мб whitelist": round(wl_bp[cs].sum() / 1e6, 1),
                           "доля положительных": f"{pos_n[cs].sum() / (2 * wl_bp[cs].sum()):.2e}"}
                       for g, cs in [("обучение", FIT[TARGET]), ("tune", GROUPS["tune"]), ("report", GROUPS["report"])]}).T)
+if CKPT_FROM != TARGET:
+    print(f"ВНИМАНИЕ: веса из прогона {CKPT_FROM}. Если в нём {TARGET} учился без отложенных групп (прогоны до 2026-10-09), "
+          "tune/report этого вида были в обучении и метрики report завышены")
 ''')
 
 md(r'''
