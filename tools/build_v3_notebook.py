@@ -293,8 +293,13 @@ display(pd.DataFrame({g: {"контигов": len(cs), "Мб whitelist": round(w
                           "доля положительных": f"{pos_n[cs].sum() / (2 * wl_bp[cs].sum()):.2e}"}
                       for g, cs in [("обучение", FIT[TARGET]), ("tune", GROUPS["tune"]), ("report", GROUPS["report"])]}).T)
 if CKPT_FROM != TARGET:
-    print(f"ВНИМАНИЕ: веса из прогона {CKPT_FROM}. Если в нём {TARGET} учился без отложенных групп (прогоны до 2026-10-09), "
-          "tune/report этого вида были в обучении и метрики report завышены")
+    src_groups = [p for p in glob.glob(f"/kaggle/input/**/{CKPT_FROM}/holdout_groups_all.json", recursive=True)]
+    if src_groups and TARGET in (sg := json.load(open(src_groups[0]))):
+        assert sg[TARGET] == GROUPS, f"группы {TARGET} не совпадают с отложенными в прогоне {CKPT_FROM}"
+        print(f"группы tune/report {TARGET} совпадают с отложенными в прогоне {CKPT_FROM}: report честный")
+    else:
+        print(f"ВНИМАНИЕ: веса из прогона {CKPT_FROM} без holdout_groups_all.json (прогоны до 2026-10-09): "
+              f"{TARGET} учился на своих tune/report, метрики report завышены")
 ''')
 
 md(r'''
