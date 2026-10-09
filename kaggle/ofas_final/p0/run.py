@@ -9,7 +9,13 @@ def log(*a): print(f"[{(time.time() - T0) / 60:6.1f} мин]", *a, flush=True)
 for src in glob.glob(f"/kaggle/input/**/{SPECIES}.*", recursive=True):
     if not src.endswith((".run.ipynb", "_features.parquet", ".npy")) and not os.path.exists(f"{OUT}/{os.path.basename(src)}"):
         shutil.copy(src, OUT)
-subprocess.run(["git", "clone", "-q", "--depth", "1", "-b", BRANCH, "https://github.com/Mitochondrion3000/epic-competiton.git", "/tmp/repo"], check=True)
+# код модели: из приватного датасета Kaggle epic-simple-code (репозиторий может быть приватным); иначе — из GitHub
+code = glob.glob("/kaggle/input/**/final.py", recursive=True)
+if code:
+    os.makedirs("/tmp/repo/simple_model", exist_ok=True)
+    for f in glob.glob(os.path.join(os.path.dirname(code[0]), "*.py")): shutil.copy(f, "/tmp/repo/simple_model/")
+else:
+    subprocess.run(["git", "clone", "-q", "--depth", "1", "-b", BRANCH, "https://github.com/Mitochondrion3000/epic-competiton.git", "/tmp/repo"], check=True)
 subprocess.run([sys.executable, "-m", "pip", "install", "-q", "lightgbm>=4", "pyarrow"], check=False)
 sys.path.insert(0, "/tmp/repo/simple_model")
 import lightgbm as lgb
