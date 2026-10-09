@@ -5,6 +5,58 @@
 
 ---
 
+## 2026-10-09 · ilPloInte3.2 (моль) · v3 отдельно, alpha 0.55
+
+**Файл:** `ilPloInte3.2.predictions.txt.gz`. Kaggle `k13polinaa/epic-v3-moth` → Output → `epic_v3/ilPloInte3.2/`.
+Ветка `claude/youthful-hopper-hjme9f`, коммит `f25558a`, ноутбук `epic_v3_bpnet.ipynb` с `EPIC_SPECIES=ilPloInte3.2`, `EPIC_CKPT_FROM=Ofas_2.0`.
+
+**Модель:** v3 (BPNet / ProCapNet, общее тело + головы на каждый вид) из прогона клопа `k13polinaa/epic-v3-ofas`:
+обучена с нуля на клопе + моли + устрице + Nematostella, 30k шагов; предсказание головами вида ilPloInte3.2 (индекс 1), без дообучения.
+В ансамбле только seed1 (seed0 разошёлся при обучении). Смеси нет: v2 для этого вида не обучали. alpha 0.55 выбран правилом по tune.
+Внешних данных и предобученных весов нет.
+
+**Оценка на report (5% train-контигов вида, ранги растянуты до размера теста):** AUPRC **0.278**, Spearman **0.617**.
+Сетка alpha на tune: 0.55 → 0.255 / 0.601; 0.70 → 0.250 / 0.655 (файл `…alpha0.70.txt.gz` в том же Output). Spearman уже выше лидера, поэтому берём 0.55 ради AUPRC.
+
+**Проверки файла:** 113 971 908 строк = позиций шаблона; значения в [0, 1]; N-позиции = 0; 81.9 МБ.
+
+**Лидерборд:** _ещё не отправлен (до этого у команды не было сабмита по этому виду; лидер сейчас NemoAgents 0.282 / 0.576)._
+
+**Теги:** `CNN`, `Raw` + свои `multi-species`, `BPNet`.
+
+**Текст для формы сабмита (EN):**
+> BPNet/ProCapNet-style dilated CNN (sequence only) with profile (multinomial) and count (MSE) heads; shared body, per-species heads,
+> trained from scratch on Ofas_2.0 + Plodia + Magallana + Nematostella training data; this file uses the ilPloInte3.2 heads, 1 model, rank-power α = 0.55.
+> No external data or pretrained weights. Hold-out contigs (ilPloInte3.2): AUPRC 0.278, Spearman 0.617.
+
+---
+
+## 2026-10-09 · cgigas_uk_roslin_v1 (устрица) · v3 отдельно, alpha 0.5
+
+**Файл:** `cgigas_uk_roslin_v1.predictions.txt.gz`. Kaggle `k13polinaa/epic-v3-oyster` → Output → `epic_v3/cgigas_uk_roslin_v1/`.
+Ветка `claude/youthful-hopper-hjme9f`, коммит `f25558a`, ноутбук `epic_v3_bpnet.ipynb` с `EPIC_SPECIES=cgigas_uk_roslin_v1`, `EPIC_CKPT_FROM=Ofas_2.0`.
+
+**Модель:** v3 (BPNet / ProCapNet, общее тело + головы на каждый вид) из прогона клопа `k13polinaa/epic-v3-ofas`:
+обучена с нуля на клопе + моли + устрице + Nematostella, 30k шагов; предсказание головами вида cgigas_uk_roslin_v1 (индекс 2), без дообучения.
+В ансамбле только seed1 (seed0 разошёлся при обучении). Смеси нет: v2 для этого вида не обучали. alpha 0.5 выбран правилом по tune.
+Внешних данных и предобученных весов нет.
+
+**Оценка на report (5% train-контигов вида, ранги растянуты до размера теста):** AUPRC **0.127**, Spearman **0.433**.
+Сетка alpha на tune: 0.50 → 0.150 / 0.468; 0.70 → 0.141 / 0.526 (файл `…alpha0.70.txt.gz`). Spearman уже выше лидера, поэтому берём 0.5 ради AUPRC.
+
+**Проверки файла:** 198 420 888 строк = позиций шаблона; значения в [0, 1]; N-позиции = 0; 172.9 МБ.
+
+**Лидерборд:** _ещё не отправлен (до этого у команды не было сабмита по этому виду; лидер сейчас VibeGenomics / NemoAgents 0.186 / 0.412)._
+
+**Теги:** `CNN`, `Raw` + свои `multi-species`, `BPNet`.
+
+**Текст для формы сабмита (EN):**
+> BPNet/ProCapNet-style dilated CNN (sequence only) with profile (multinomial) and count (MSE) heads; shared body, per-species heads,
+> trained from scratch on Ofas_2.0 + Plodia + Magallana + Nematostella training data; this file uses the cgigas_uk_roslin_v1 heads, 1 model, rank-power α = 0.5.
+> No external data or pretrained weights. Hold-out contigs (cgigas_uk_roslin_v1): AUPRC 0.127, Spearman 0.433.
+
+---
+
 ## 2026-10-09 · Ofas_2.0 (клоп) · смесь v2 + v3, alpha 0.70
 
 **Файл:** `Ofas_2.0.predictions.alpha0.70.txt.gz`. Kaggle `k13polinaa/epic-v3-ofas-requant` → Output → `epic_v3/Ofas_2.0/`.
