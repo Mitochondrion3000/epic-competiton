@@ -29,6 +29,9 @@
 
 **Лидерборд:** _ещё не отправлен (до этого у команды было 0.203 / 0.478, 7-е место)._
 
+**Теги:** `CNN`, `Ensemble`, `Raw` + свои `multi-species`, `BPNet`.
+Stage не ставим: Baseline/Finetune/Debug не подходят (модели обучены с нуля, предобученных весов нет).
+
 **Текст для формы сабмита (EN):**
 > Blend of two sequence-only CNNs (0.6 × v2 + 0.4 × v3, z-scored log-rates), rank-power quantised (α = 0.70).
 > v2: InitiationNet-style multi-scale CNN with attention, trained on Ofas_2.0 only (2 seeds).
