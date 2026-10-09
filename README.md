@@ -9,6 +9,8 @@ Epic Autosome competition - Large Milkweed Bug leaderboard
 | `epic_pipeline_annotated(лучший_вариант).ipynb` | первый пайплайн: dilated CNN, обучение и сабмит |
 | `epic_v2_model.ipynb` | **новая модель v2** поверх бейзлайна InitiationNet: ансамбль, EMA, attention, головы на реплики, TTA, подбор квантования на hold-out; все параметры и архитектура визуализированы |
 
+Какие модели обучены, с какими тегами и что вошло в каждый сабмит — в [MODELS.md](MODELS.md).
+
 [Открыть v2 в Colab](https://colab.research.google.com/github/Mitochondrion3000/epic-competiton/blob/main/epic_v2_model.ipynb)
 
 ## Как запустить v2
