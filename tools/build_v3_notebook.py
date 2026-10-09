@@ -49,7 +49,7 @@ if DEVICE == "cuda":
 else:
     AMP_DTYPE = None
     print("GPU нет: на CPU годится только проверка кода (EPIC_FAST_DEV=1)")
-    if os.environ.get("EPIC_FAST_DEV") != "1":
+    if os.environ.get("EPIC_FAST_DEV") != "1" and os.environ.get("EPIC_REUSE_V3") != "1":
         raise RuntimeError("GPU не найден. Kaggle: Settings ноутбука -> Accelerator = GPU T4 x2 (нужен подтверждённый телефон)")
 
 def autocast():
@@ -102,8 +102,8 @@ CFG = dict(
     # --- предсказание и постобработка ---
     TTA_SHIFTS=2, PRED_BATCH=32,
     KEEP_MODEL_FRAC=0.8,
-    EXTRA_SUB_ALPHAS=(0.8,),  # дополнительно записать сабмиты с этими alpha (Spearman растёт с alpha, AUPRC немного падает)      # в ансамбль идут модели с AUPRC на tune >= этой доли от лучшей
-    ALPHAS=(0.0, 0.3, 0.4, 0.5, 0.55, 0.6, 0.65, 0.7, 0.8), KEEP_FRAC=0.995,
+    EXTRA_SUB_ALPHAS=(0.7, 0.8),  # дополнительно записать сабмиты с этими alpha (Spearman растёт с alpha, AUPRC немного падает)      # в ансамбль идут модели с AUPRC на tune >= этой доли от лучшей
+    ALPHAS=(0.0, 0.3, 0.4, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.9), KEEP_FRAC=0.995,
     BLEND_WEIGHTS=tuple(np.round(np.arange(0, 1.01, 0.1), 2)),   # вес v3 в смеси с v2
 )
 if FAST_DEV:
@@ -446,14 +446,18 @@ def raw_score(pred, gt, mask=None):
     y = gt > 0
     return {"AUPRC": float(average_precision_score(y, pred)), "Spearman": spearman_dense(pred[y], gt[y])}
 
-def rank_power(score, alpha, nmask=None):
-    # место r (1 = сильнейшее) -> r^(-alpha), 5 знаков; N -> 0. float64: ранги смеси не должны слипаться
+def rank_power(score, alpha, nmask=None, n_ref=None):
+    # место r (1 = сильнейшее) -> r^(-alpha), 5 знаков; N -> 0. float64: ранги смеси не должны слипаться.
+    # n_ref: размер набора, под который подбираем alpha (не-N позиции теста). Ранги растягиваются в n_ref / n раз,
+    # чтобы округление до 5 знаков вело себя как в сабмите: иначе на hold-out (68 млн) нулей намного меньше, чем в тесте (328 млн)
     x = np.asarray(score, dtype=np.float64).copy()
     if nmask is not None: x[nmask] = -np.inf
     order = np.argsort(-x, kind="stable"); del x
     ranks = np.empty(len(order), np.int64); ranks[order] = np.arange(1, len(order) + 1); del order
     n = len(ranks)
-    s = (1.0 - (ranks - 1) / n) if alpha == 0 else np.power(ranks.astype(np.float64), -alpha)
+    n_valid = n - (int(nmask.sum()) if nmask is not None else 0)
+    r = ranks.astype(np.float64) * (n_ref / n_valid if n_ref else 1.0)
+    s = (1.0 - (ranks - 1) / n) if alpha == 0 else np.power(r, -alpha)
     s = (np.rint(np.clip(s, 0, 1) * SCALE) / SCALE).astype(np.float32)
     if nmask is not None: s[nmask] = 0.0
     return s
@@ -737,13 +741,28 @@ def per_model(fn):
 
 code(r'''
 # 7.2 tune и report: каждая модель и ансамбль v3; подбор alpha на tune
+# Размер теста (не-N позиций): alpha подбираем и оцениваем с рангами, растянутыми до этого размера (см. rank_power)
+TEST_ROWS = make_rows(T["tpl"]); TEST_N = rows_nmask(TEST_ROWS); TEST_LEN = len(TEST_N)
+N_REF = int((~TEST_N).sum())
+print(f"тест: {TEST_LEN:,} позиций, не-N {N_REF:,}: под этот размер подбирается alpha")
+
 def choose_alpha(score, gt, nmask, alphas=CFG["ALPHAS"]):
     sel = ~nmask
-    grid = pd.DataFrame([{"alpha": a, **official_score(rank_power(score[sel], a), gt[sel])} for a in alphas]).set_index("alpha")
+    grid = pd.DataFrame([{"alpha": a, **official_score(rank_power(score[sel], a, n_ref=N_REF), gt[sel])} for a in alphas]).set_index("alpha")
     return float(grid.index[grid.AUPRC >= CFG["KEEP_FRAC"] * grid.AUPRC.max()].max()), grid
 
 def evaluate(score, gt, nmask, alpha):
-    return {**{f"{k} (сырое)": v for k, v in raw_score(score, gt, ~nmask).items()}, **official_score(rank_power(score, alpha, nmask), gt)}
+    return {**{f"{k} (сырое)": v for k, v in raw_score(score, gt, ~nmask).items()}, **official_score(rank_power(score, alpha, nmask, n_ref=N_REF), gt)}
+
+# EPIC_REUSE_V3=1: взять готовые предсказания v3 (v3_holdout_*_lograte.npy, v3_test_lograte.npy) из Input — GPU не нужен
+def find_v3_cache():
+    if os.environ.get("EPIC_REUSE_V3") != "1": return None
+    need = ("v3_holdout_tune_lograte.npy", "v3_holdout_report_lograte.npy", "v3_test_lograte.npy")
+    for p in glob.glob("/kaggle/input/**/v3_test_lograte.npy", recursive=True):
+        d = os.path.dirname(p)
+        if all(os.path.exists(f"{d}/{f}") for f in need): return d
+    return None
+V3_CACHE = find_v3_cache(); print("готовые предсказания v3:", V3_CACHE)
 
 def show(df, name):
     # таблица видна и в HTML, и в логе Kaggle (display в лог не попадает), и сохраняется в CSV
@@ -752,15 +771,16 @@ def show(df, name):
 HO = {}
 for gname in ("tune", "report"):
     rows = train_rows(GROUPS[gname])
-    HO[gname] = dict(rows=rows, gt=rows_targets(rows), n=rows_nmask(rows),
-                     preds=per_model(lambda i, m: predict_rows([m], rows, desc=f"{gname}, модель {i}")))
+    HO[gname] = dict(rows=rows, gt=rows_targets(rows), n=rows_nmask(rows))
+    if V3_CACHE: HO[gname]["preds"] = [np.load(f"{V3_CACHE}/v3_holdout_{gname}_lograte.npy")]
+    else: HO[gname]["preds"] = per_model(lambda i, m: predict_rows([m], rows, desc=f"{gname}, модель {i}"))
 
 # Отбор моделей: сид, который разошёлся при обучении, портит среднее. Оставляем модели с AUPRC на tune >= KEEP_MODEL_FRAC * лучшей
 tn = HO["tune"]
 seed_auprc = [raw_score(p, tn["gt"], ~tn["n"])["AUPRC"] for p in tn["preds"]]
 KEEP = [i for i, a in enumerate(seed_auprc) if a >= CFG.get("KEEP_MODEL_FRAC", 0.8) * max(seed_auprc)]
 print("AUPRC (сырое) на tune по моделям:", np.round(seed_auprc, 4), "-> в ансамбле модели", KEEP)
-MODELS_ALL, MODELS = MODELS, [MODELS[i] for i in KEEP]
+MODELS_ALL, MODELS = MODELS, ([MODELS[i] for i in KEEP] if not V3_CACHE else MODELS)
 for gname in ("tune", "report"):
     HO[gname]["v3"] = np.mean([HO[gname]["preds"][i] for i in KEEP], axis=0)
     np.save(f"{OUT_DIR}/v3_holdout_{gname}_lograte.npy", HO[gname]["v3"])
@@ -839,8 +859,8 @@ if BLEND is None:
 md("## 9. Тест и сабмит")
 code(r'''
 # 9.1 Предсказание теста, смесь, офлайн-оценка (если есть ответы, т.е. Nematostella), файл сабмита
-TEST_ROWS = make_rows(T["tpl"]); TEST_N = rows_nmask(TEST_ROWS); TEST_LEN = len(TEST_N)
-TEST_V3 = predict_rows(MODELS, TEST_ROWS, desc="тест")
+TEST_V3 = np.load(f"{V3_CACHE}/v3_test_lograte.npy") if V3_CACHE else predict_rows(MODELS, TEST_ROWS, desc="тест")
+assert len(TEST_V3) == TEST_LEN
 np.save(f"{OUT_DIR}/v3_test_lograte.npy", TEST_V3)
 FINAL = TEST_V3
 if BLEND is not None:
