@@ -101,7 +101,8 @@ CFG = dict(
     STOP_AFTER_HOURS=11.0 if ON_KAGGLE else None,
     # --- предсказание и постобработка ---
     TTA_SHIFTS=2, PRED_BATCH=32,
-    KEEP_MODEL_FRAC=0.8,      # в ансамбль идут модели с AUPRC на tune >= этой доли от лучшей
+    KEEP_MODEL_FRAC=0.8,
+    EXTRA_SUB_ALPHAS=(0.8,),  # дополнительно записать сабмиты с этими alpha (Spearman растёт с alpha, AUPRC немного падает)      # в ансамбль идут модели с AUPRC на tune >= этой доли от лучшей
     ALPHAS=(0.0, 0.3, 0.4, 0.5, 0.55, 0.6, 0.65, 0.7, 0.8), KEEP_FRAC=0.995,
     BLEND_WEIGHTS=tuple(np.round(np.arange(0, 1.01, 0.1), 2)),   # вес v3 в смеси с v2
 )
@@ -845,7 +846,9 @@ FINAL = TEST_V3
 if BLEND is not None:
     v2t = np.load(f"{V2_DIR}/test_lograte.npy"); assert len(v2t) == TEST_LEN, "длина test_lograte v2 не совпала с шаблоном"
     FINAL = blend(TEST_V3, v2t, BLEND["w"], BLEND["how"], TEST_N); del v2t
-SUB = rank_power(FINAL, ALPHA, TEST_N); del FINAL
+np.save(f"{OUT_DIR}/test_nmask.npy", TEST_N)
+np.save(f"{OUT_DIR}/test_final_score.npy", FINAL.astype(np.float32))   # смесь до квантования: alpha можно менять без GPU
+SUB = rank_power(FINAL, ALPHA, TEST_N)
 print(f"тест: {TEST_LEN:,} позиций, N: {int(TEST_N.sum()):,}")
 
 gt_path = f"{BASES[TARGET]}/ground_truth/csRNA-test.txt.gz"
@@ -869,6 +872,12 @@ def write_submission(ints, path, chunk=8_000_000):
             fh.write(buf.tobytes())
 
 write_submission(ints, sub_path)
+for a in CFG.get("EXTRA_SUB_ALPHAS", ()):
+    if a == ALPHA: continue
+    extra = f"{OUT_DIR}/{TARGET}.predictions.alpha{a:.2f}.txt.gz"
+    write_submission(np.rint(rank_power(FINAL, a, TEST_N).astype(np.float64) * SCALE).astype(np.int64), extra)
+    print("дополнительный сабмит:", extra)
+del FINAL
 with gzip.open(sub_path, "rt") as fh: head = [next(fh).strip() for _ in range(3)]
 assert head == [f"{v / SCALE:.5f}" for v in ints[:3]]
 checks = {"строк = позиций шаблона": len(SUB) == TEST_LEN, "значения в [0, 1]": bool((SUB >= 0).all() and (SUB <= 1).all()),
