@@ -64,6 +64,10 @@ SPECIES = [TARGET] + AUX                                                  # ин
 FAST_DEV = os.environ.get("EPIC_FAST_DEV") == "1"
 SESSION_T0 = time.time()
 TAG = "v3bp"
+# EPIC_CKPT_FROM: взять готовые веса, обученные для другого целевого вида (например Ofas_2.0, где моль и устрица были
+# вспомогательными), и предсказать TARGET его собственными головами. Обучения при этом нет
+CKPT_FROM = os.environ.get("EPIC_CKPT_FROM", TARGET)
+HEAD = 0            # номер головы целевого вида; при CKPT_FROM != TARGET уточняется после загрузки весов (раздел 6.4)
 
 ON_KAGGLE = os.path.isdir("/kaggle/working")
 ON_COLAB = "google.colab" in sys.modules
@@ -78,7 +82,7 @@ os.makedirs(OUT_DIR, exist_ok=True)
 IMPORT_CKPT_GLOB = os.environ.get("EPIC_IMPORT_CKPT", "/kaggle/input/**/*.pt" if ON_KAGGLE else "")
 for src in sorted(glob.glob(IMPORT_CKPT_GLOB, recursive=True)) if IMPORT_CKPT_GLOB else []:
     dst = f"{OUT_DIR}/{os.path.basename(src)}"
-    if os.path.basename(src).startswith(f"{TARGET}_{TAG}_") and not os.path.exists(dst):
+    if os.path.basename(src).startswith(f"{CKPT_FROM}_{TAG}_") and not os.path.exists(dst):
         shutil.copy(src, dst); print("импортирован чекпоинт:", src)
 
 CFG = dict(
@@ -506,7 +510,7 @@ def predict_windows(models, codes, masks, cfg):
         res = []
         for net in models:
             net.eval(); dev = next(net.parameters()).device
-            sp = torch.zeros(len(c), dtype=torch.long, device=dev)
+            sp = torch.full((len(c),), HEAD, dtype=torch.long, device=dev)
             with autocast(): prof, cnt = forward_both(net, encode(c.to(dev), cfg["USE_LOWERCASE"]), sp, cfg["CROP"])
             res.append(to_lograte(prof, cnt, mk.to(dev), cfg["CROP"]).cpu())
         out.append((sum(res) / len(res)).numpy())
@@ -538,7 +542,7 @@ class TrainingPaused(Exception):
 SESSION_KEYS = ("STOP_AFTER_HOURS", "CKPT_EVERY", "EVAL_EVERY", "PRED_BATCH")
 
 def ckpt_path(seed):
-    return f"{OUT_DIR}/{TARGET}_{TAG}_seed{seed}.pt"
+    return f"{OUT_DIR}/{CKPT_FROM}_{TAG}_seed{seed}.pt"
 
 INIT_LOCK = threading.Lock()
 
@@ -550,6 +554,7 @@ def train_model(cfg, seed, gpu=None):
         net = build_model(ck["cfg"]).to(DEVICE); net.load_state_dict(ck["model"]); net.eval()
         print("загружена готовая модель", final); return net, ck["hist"], ck["evals"]
 
+    assert CKPT_FROM == TARGET, f"нет готовых весов {final}: при EPIC_CKPT_FROM обучение не запускается"
     state = torch.load(last, map_location=DEVICE, weights_only=False) if os.path.exists(last) else None
     if state is not None:
         diff = {k: (state["cfg"][k], cfg[k]) for k in cfg if k not in SESSION_KEYS and k in state["cfg"] and state["cfg"][k] != cfg[k]}
@@ -658,6 +663,11 @@ else:
     done = train_on_gpu(0)
 done.sort(key=lambda r: r[0])
 MODELS = [net for _, net, _, _ in done]
+if CKPT_FROM != TARGET:
+    ck_species = list(torch.load(ckpt_path(done[0][0]), map_location="cpu", weights_only=False)["cfg"]["SPECIES"])
+    assert TARGET in ck_species, f"в весах {CKPT_FROM} нет головы для {TARGET}: {ck_species}"
+    HEAD = ck_species.index(TARGET)
+    print(f"веса {CKPT_FROM}, головы вида {TARGET}: индекс {HEAD} из {ck_species}")
 RUNS = {f"seed {seed}": (h, e) for seed, _, h, e in done}
 print(f"обучение заняло {(time.time() - t0) / 3600:.2f} ч")
 
