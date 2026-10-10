@@ -5,6 +5,47 @@
 
 ---
 
+## 2026-10-10 · ilPloInte3.2 (моль) · смесь v2moth + v3b2, alpha 0.70
+
+**Файл:** `ilPloInte3.2.predictions.txt.gz` (в датасете `ivanmitochondrion/epic-predictions`: `submissions/ilPloInte3.2.predictions.blend_v2v3.alpha0.70.txt.gz.bin`).
+Kaggle `k13polinaa/epic-v3-moth-blend` (версия 3) → Output → `epic_v3/ilPloInte3.2/`. Ветка `claude/youthful-hopper-hjme9f`, коммит `547c632`.
+Источники: `k13polinaa/epic-v2-moth-pred` (v2, веса `ivanmitochondrion/epic-v2-moth-ckpt`) и `k13polinaa/epic-v3b2-moth` (v3).
+
+**Модель:** 0.6 × v2 + 0.4 × v3 (стандартизованные log-rate), rank-power квантование с alpha 0.70.
+- **v2 (`bug+moth`):** InitiationNet + attention, общая сеть на клопе и моли со своей головой у каждого вида, 2 сида, 96k шагов
+  (`Ofas_2.0_v2moth_seed0/1.pt`, ветка `claude/dreamy-albattani-3tmvp6`). Предсказание головой моли.
+- **v3 (`v3b2`):** BPNet / ProCapNet, обучена с нуля на клопе + моли + устрице + Nematostella (с тестом Nematostella), 30k шагов, LR 5e-4, 2 сида;
+  tune/report моли отложены. Предсказание головами моли.
+- **Вес и alpha заданы заранее** (`EPIC_BLEND=z:0.4`, `EPIC_ALPHA=0.7`, как у смеси клопа), а не подобраны: v2 училась на **всех** контигах моли,
+  включая tune/report, поэтому сетка на tune смещена в её пользу (она выбрала бы w_v3 = 0.1).
+- Внешних данных и предобученных весов нет.
+
+**Оценка на report (ранги растянуты до размера теста):**
+
+| | AUPRC | Spearman | честная? |
+|---|---|---|---|
+| v2 | 0.386 | 0.780 | нет: v2 видела эти контиги |
+| v3 | 0.171 | 0.339 | да |
+| **этот сабмит** | 0.359 | 0.785 | нет |
+
+Честного прогноза у смеси нет, сравнивать надо по лидерборду с нынешним сабмитом моли (v3 отдельно, 0.177 / 0.378).
+Запасной файл в том же Output: `…alpha0.80.txt.gz` (report 0.346 / 0.808, тоже нечестный).
+
+**Проверки файла:** 113 971 908 строк = позиций шаблона; значения в [0, 1]; N-позиции = 0; 1 720 уровней; 31.4 МБ.
+
+**Лидерборд:** —
+
+**Теги:** `CNN`, `Ensemble`, `Raw` + свои `multi-species`, `BPNet`.
+
+**Текст для формы сабмита (EN):**
+> Blend of two sequence-only CNNs (0.6 × v2 + 0.4 × v3, z-scored log-rates), rank-power quantised (α = 0.70).
+> v2: InitiationNet-style multi-scale CNN with attention, trained jointly on Ofas_2.0 + ilPloInte3.2 with per-species heads (2 seeds); ilPloInte3.2 head.
+> v3: BPNet/ProCapNet-style dilated CNN with profile (multinomial) and count (MSE) heads, shared body and per-species heads,
+> trained from scratch on Ofas_2.0 + Plodia + Magallana + Nematostella training data; ilPloInte3.2 heads.
+> No external data or pretrained weights. Blend weight and α fixed in advance (v2 saw the hold-out contigs of this species).
+
+---
+
 ## 2026-10-09 · ilPloInte3.2 (моль) · v3 отдельно, alpha 0.55
 
 **Файл:** `ilPloInte3.2.predictions.txt.gz`. Kaggle `k13polinaa/epic-v3-moth` → Output → `epic_v3/ilPloInte3.2/`.
