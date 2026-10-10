@@ -103,7 +103,8 @@ CFG = dict(
     WEIGHT_DECAY=1e-2, WARMUP=0.05,
     DIVERGE_FRAC=0.5, EMA_DECAY=0.999,
     EVAL_EVERY=2000, EVAL_BP=4_000_000,
-    N_SEEDS=2, CKPT_EVERY=1000,
+    N_SEEDS=int(os.environ.get("EPIC_N_SEEDS", "2")), CKPT_EVERY=1000,
+    HO_MAX_BP=int(float(os.environ.get("EPIC_HO_MAX_BP", "0")) * 1e6) or None,   # оценка tune/report на выборке (Мб на группу): огромные хромосомы не влезают в память
     STOP_AFTER_HOURS=11.0 if ON_KAGGLE else None,
     # --- предсказание и постобработка ---
     TTA_SHIFTS=2, PRED_BATCH=32,
@@ -485,15 +486,19 @@ def rank_power(score, alpha, nmask=None, n_ref=None):
     # место r (1 = сильнейшее) -> r^(-alpha), 5 знаков; N -> 0. float64: ранги смеси не должны слипаться.
     # n_ref: размер набора, под который подбираем alpha (не-N позиции теста). Ранги растягиваются в n_ref / n раз,
     # чтобы округление до 5 знаков вело себя как в сабмите: иначе на hold-out (68 млн) нулей намного меньше, чем в тесте (328 млн)
-    x = np.asarray(score, dtype=np.float64).copy()
-    if nmask is not None: x[nmask] = -np.inf
-    order = np.argsort(-x, kind="stable"); del x
-    ranks = np.empty(len(order), np.int64); ranks[order] = np.arange(1, len(order) + 1); del order
-    n = len(ranks)
+    # память: на пике два массива по 8 байт на позицию (у осьминога тест 417 млн позиций)
+    x = np.negative(np.asarray(score, dtype=np.float64))
+    if nmask is not None: x[nmask] = np.inf
+    order = np.argsort(x, kind="stable"); del x
+    n = len(order)
+    r = np.empty(n, np.float64); r[order] = np.arange(1, n + 1, dtype=np.float64); del order
     n_valid = n - (int(nmask.sum()) if nmask is not None else 0)
-    r = ranks.astype(np.float64) * (n_ref / n_valid if n_ref else 1.0)
-    s = (1.0 - (ranks - 1) / n) if alpha == 0 else np.power(r, -alpha)
-    s = (np.rint(np.clip(s, 0, 1) * SCALE) / SCALE).astype(np.float32)
+    if alpha == 0: r -= 1; r /= -n; r += 1
+    else:
+        if n_ref: r *= n_ref / n_valid
+        np.power(r, -alpha, out=r)
+    np.clip(r, 0, 1, out=r); r *= SCALE; np.rint(r, out=r); r /= SCALE
+    s = r.astype(np.float32); del r
     if nmask is not None: s[nmask] = 0.0
     return s
 ''')
@@ -661,7 +666,8 @@ def train_model(cfg, seed, gpu=None):
                 rollbacks += 1; lr_scale *= 0.5
                 net.load_state_dict(best_state); ema.model.load_state_dict(best_state); opt.state.clear()
                 tqdm.write(f"  ! [seed {seed}] AUPRC упал до {r_ema['AUPRC']:.4f}: откат к лучшим весам, LR x{lr_scale:g}")
-                if rollbacks > 4: raise RuntimeError("обучение расходится: уменьшите LR и удалите *.last.pt")
+                if rollbacks > 4:   # сид не учится: останавливаем его на лучших весах; отбор моделей (KEEP_MODEL_FRAC) решит, брать ли его
+                    tqdm.write(f"  ! [seed {seed}] 5 откатов: обучение этого сида остановлено на шаге {step} с лучшими весами"); pbar.close(); break
         if step < cfg["STEPS"]:
             if step % cfg["CKPT_EVERY"] == 0: save_last(step)
             hours = cfg.get("STOP_AFTER_HOURS")
@@ -701,6 +707,9 @@ if CKPT_FROM != TARGET:
     HEAD = ck_species.index(TARGET)
     print(f"веса {CKPT_FROM}, головы вида {TARGET}: индекс {HEAD} из {ck_species}")
 RUNS = {f"seed {seed}": (h, e) for seed, _, h, e in done}
+for sp in SPECIES:   # дальше нужен только целевой вид: освобождаем память под предсказание
+    if sp != TARGET: DS[sp].update(genome=None, in_wl=None, track=None)
+import gc; gc.collect()
 print(f"обучение заняло {(time.time() - t0) / 3600:.2f} ч")
 
 fig, ax = plt.subplots(1, 4, figsize=(18, 3.2))
@@ -810,9 +819,21 @@ def show(df, name):
     # таблица видна и в HTML, и в логе Kaggle (display в лог не попадает), и сохраняется в CSV
     display(df); print(f"--- {name}\n{df.to_string()}"); df.to_csv(f"{OUT_DIR}/{name}.csv")
 
+def cap_rows(rows, max_bp, piece=1_000_000, seed=0):
+    # выборка кусков whitelist (до piece нт, обе цепи) суммарно до max_bp на цепь; детерминирована (seed), одинакова во всех прогонах
+    plus = rows[rows.strand == 0]
+    starts = [np.arange(s, e, piece) for s, e in zip(plus.start.values, plus.end.values)]
+    ch = pd.DataFrame({"chrom": np.repeat(plus.chrom.values, [len(a) for a in starts]), "start": np.concatenate(starts)})
+    ch["end"] = np.minimum(ch.start + piece, np.repeat(plus.end.values, [len(a) for a in starts]))
+    ch = ch.sample(frac=1, random_state=seed); ch = ch[np.cumsum((ch.end - ch.start).values) <= max_bp].sort_values(["chrom", "start"])
+    return make_rows(pd.concat([ch.assign(strand=0), ch.assign(strand=1)]))
+
 HO = {}
 for gname in ("tune", "report"):
     rows = train_rows(GROUPS[gname])
+    if CFG.get("HO_MAX_BP") and rows.len.sum() / 2 > CFG["HO_MAX_BP"]:
+        full = rows.len.sum() / 2; rows = cap_rows(rows, CFG["HO_MAX_BP"])
+        print(f"{gname}: оцениваем на выборке {rows.len.sum() / 2 / 1e6:.0f} из {full / 1e6:.0f} Мб (HO_MAX_BP)")
     HO[gname] = dict(rows=rows, gt=rows_targets(rows), n=rows_nmask(rows))
     if V3_CACHE: HO[gname]["preds"] = [np.load(f"{V3_CACHE}/v3_holdout_{gname}_lograte.npy")]
     else: HO[gname]["preds"] = per_model(lambda i, m: predict_rows([m], rows, desc=f"{gname}, модель {i}"))
@@ -930,7 +951,7 @@ if os.path.exists(gt_path):
     show(pd.DataFrame({nm: official_score(SUB, gt, mk) for nm, mk in (("half1", m1), ("half2", m2), ("весь тест", None))}).T.round(4), "test_offline")
 
 sub_path = f"{OUT_DIR}/{TARGET}.predictions.txt.gz"
-ints = np.rint(SUB.astype(np.float64) * SCALE).astype(np.int64)
+ints = np.rint(SUB.astype(np.float64) * SCALE).astype(np.int32)
 
 def write_submission(ints, path, chunk=8_000_000):
     with gzip.open(path, "wb", compresslevel=4) as fh:
@@ -945,7 +966,7 @@ write_submission(ints, sub_path)
 for a in CFG.get("EXTRA_SUB_ALPHAS", ()):
     if a == ALPHA: continue
     extra = f"{OUT_DIR}/{TARGET}.predictions.alpha{a:.2f}.txt.gz"
-    write_submission(np.rint(rank_power(FINAL, a, TEST_N).astype(np.float64) * SCALE).astype(np.int64), extra)
+    write_submission(np.rint(rank_power(FINAL, a, TEST_N).astype(np.float64) * SCALE).astype(np.int32), extra)
     print("дополнительный сабмит:", extra)
 del FINAL
 with gzip.open(sub_path, "rt") as fh: head = [next(fh).strip() for _ in range(3)]
