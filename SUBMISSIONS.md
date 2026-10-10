@@ -5,6 +5,41 @@
 
 ---
 
+## 2026-10-10 · ASM119413v2 (осьминог) · v3 на своих данных + устрица, alpha 0.5
+
+**Файл:** `ASM119413v2.predictions.txt.gz` (в датасете `ivanmitochondrion/epic-predictions`: `submissions/ASM119413v2.predictions.v3.alpha0.50.txt.gz.bin`).
+Kaggle `k13polinaa/epic-v3-octopus-pred` → Output → `epic_v3/ASM119413v2/` (веса из `k13polinaa/epic-v3-octopus`).
+Ветка `claude/youthful-hopper-hjme9f`, коммит `bd1214e`, ноутбук `epic_v3_bpnet.ipynb` с `EPIC_SPECIES=ASM119413v2`, `EPIC_TAG=v3b2`
+(обучение: `EPIC_AUX=cgigas_uk_roslin_v1`).
+
+**Модель:** v3 (BPNet / ProCapNet: dilated CNN, общее тело, головы «профиль» и «счёт» на каждый вид), обучена с нуля на train-данных
+осьминога + устрицы (тоже моллюск), 30k шагов, LR 5e-4, 2 сида (оба в ансамбле); tune/report отложены у обоих видов. Предсказание головами осьминога.
+alpha 0.5 выбран правилом по tune. Внешних данных и предобученных весов нет.
+
+**Оценка на report (честная; выборка 30 Мб из 172 Мб группы, ранги растянуты до размера теста):**
+
+| | AUPRC | Spearman |
+|---|---|---|
+| перенос v2 с насекомых (`epic-v2-transfer-octopus`, report) | 0.007 | 0.107 |
+| бейзлайн CNN из write-up организаторов (их отложенные данные, сравнение примерное) | 0.068 | 0.291 |
+| v3 seed 0 / seed 1 | 0.060 / 0.051 | 0.194 / 0.193 |
+| **этот сабмит (2 сида)** | **0.063** | **0.198** |
+
+Сетка alpha на tune: 0.5 → 0.050 / 0.306; 0.70 → 0.047 / 0.336 (файл `…alpha0.70.txt.gz` в том же Output).
+
+**Проверки файла:** 416 885 800 строк = позиций шаблона; значения в [0, 1]; N-позиции = 0 (67 011 820 N); 4 068 уровней; 264.1 МБ.
+
+**Лидерборд:** —
+
+**Теги:** `CNN`, `Ensemble`, `Raw` + свои `multi-species`, `BPNet`.
+
+**Текст для формы сабмита (EN):**
+> BPNet/ProCapNet-style dilated CNN (sequence only) with profile (multinomial) and count (MSE) heads; shared body, per-species heads,
+> trained from scratch on ASM119413v2 + Magallana (cgigas_uk_roslin_v1) training data; 2 seeds averaged, rank-power quantised (α = 0.5).
+> No external data or pretrained weights. Hold-out contigs (ASM119413v2): AUPRC 0.063, Spearman 0.198.
+
+---
+
 ## 2026-10-10 · sSquSuc5.hap2 (акула) · v3 на своих данных, alpha 0.5
 
 **Файл:** `sSquSuc5.hap2.predictions.txt.gz` (в датасете `ivanmitochondrion/epic-predictions`: `submissions/sSquSuc5.hap2.predictions.v3.alpha0.50.txt.gz.bin`).
