@@ -5,6 +5,38 @@
 
 ---
 
+## 2026-10-10 · sSquSuc5.hap2 (акула) · v3 на своих данных, alpha 0.5
+
+**Файл:** `sSquSuc5.hap2.predictions.txt.gz` (в датасете `ivanmitochondrion/epic-predictions`: `submissions/sSquSuc5.hap2.predictions.v3.alpha0.50.txt.gz.bin`).
+Kaggle `k13polinaa/epic-v3-shark-pred` → Output → `epic_v3/sSquSuc5.hap2/` (веса из `k13polinaa/epic-v3-shark`).
+Ветка `claude/youthful-hopper-hjme9f`, коммит `bd1214e`, ноутбук `epic_v3_bpnet.ipynb` с `EPIC_SPECIES=sSquSuc5.hap2`, `EPIC_AUX=''`, `EPIC_TAG=v3b2`.
+
+**Модель:** v3 (BPNet / ProCapNet: dilated CNN, головы «профиль» и «счёт»), обучена с нуля только на train-данных акулы, 30k шагов, LR 5e-4.
+1 модель (seed0); seed1 разошёлся (5 откатов) и в сабмит не вошёл. alpha 0.5 выбран правилом по tune. Внешних данных и предобученных весов нет.
+
+**Оценка на report (честная: tune/report отложены; выборка 30 Мб из 371 Мб группы, ранги растянуты до размера теста):**
+
+| | AUPRC | Spearman |
+|---|---|---|
+| перенос v2 с насекомых (`epic-v2-transfer-dogfish`, report) | 0.006 | 0.195 |
+| бейзлайн CNN из write-up организаторов (их отложенные данные, сравнение примерное) | 0.110 | 0.358 |
+| **этот сабмит** | **0.057** | **0.246** |
+
+Сетка alpha на tune: 0.5 → 0.052 / 0.274; 0.70 → 0.050 / 0.286 (файл `…alpha0.70.txt.gz` в том же Output).
+
+**Проверки файла:** 344 993 974 строки = позиций шаблона; значения в [0, 1]; N-позиции = 0; 4 068 уровней; 289.9 МБ.
+
+**Лидерборд:** —
+
+**Теги:** `CNN`, `Raw` + свой `BPNet`.
+
+**Текст для формы сабмита (EN):**
+> BPNet/ProCapNet-style dilated CNN (sequence only) with profile (multinomial) and count (MSE) heads,
+> trained from scratch on sSquSuc5.hap2 training data only (1 model), rank-power quantised (α = 0.5).
+> No external data or pretrained weights. Hold-out contigs (sSquSuc5.hap2): AUPRC 0.057, Spearman 0.246.
+
+---
+
 ## 2026-10-10 · ilPloInte3.2 (моль) · смесь v2moth + v3b2, alpha 0.70
 
 **Файл:** `ilPloInte3.2.predictions.txt.gz` (в датасете `ivanmitochondrion/epic-predictions`: `submissions/ilPloInte3.2.predictions.blend_v2v3.alpha0.70.txt.gz.bin`).
