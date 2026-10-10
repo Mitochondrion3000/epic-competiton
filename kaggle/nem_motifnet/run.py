@@ -205,7 +205,7 @@ with torch.no_grad():
     for x, _ in VB[:8]:
         a = Fn.softplus(net.motif(x)); z = net.curve(a)[:, 0::2]; contrib.append(z.std(dim=(0, 2)).numpy())
 imp = np.mean(contrib, 0)
-Wm, Wc = net.motif.weight.numpy(), net.curve.weight[:, 0].numpy()
+Wm, Wc = net.motif.weight.detach().numpy(), net.curve.weight[:, 0].detach().numpy()
 d = np.arange(-UP, DOWN + 1)
 info = []
 for k in np.argsort(-imp):
