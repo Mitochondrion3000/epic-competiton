@@ -800,7 +800,7 @@ def evaluate(score, gt, nmask, alpha):
 def find_v3_cache():
     if os.environ.get("EPIC_REUSE_V3") != "1": return None
     need = ("v3_holdout_tune_lograte.npy", "v3_holdout_report_lograte.npy", "v3_test_lograte.npy")
-    for p in glob.glob("/kaggle/input/**/v3_test_lograte.npy", recursive=True):
+    for p in glob.glob(f"/kaggle/input/**/{TARGET}/v3_test_lograte.npy", recursive=True):   # только папка целевого вида
         d = os.path.dirname(p)
         if all(os.path.exists(f"{d}/{f}") for f in need): return d
     return None
@@ -848,7 +848,7 @@ code(r'''
 # 8.1 Подбор смеси на tune, проверка на report
 def find_v2():
     need = ("holdout_tune_lograte.npy", "holdout_report_lograte.npy", "test_lograte.npy")
-    cands = [os.environ.get("EPIC_V2_DIR", "")] + [os.path.dirname(p) for p in glob.glob("/kaggle/input/**/holdout_tune_lograte.npy", recursive=True)]
+    cands = [os.environ.get("EPIC_V2_DIR", "")] + [os.path.dirname(p) for p in glob.glob(f"/kaggle/input/**/{TARGET}/holdout_tune_lograte.npy", recursive=True)]
     for d in cands:
         if d and all(os.path.exists(f"{d}/{f}") for f in need): return d
     return None
