@@ -586,6 +586,7 @@ def train_model(cfg, seed, gpu=None):
         print("загружена готовая модель", final); return net, ck["hist"], ck["evals"]
 
     assert CKPT_FROM == TARGET, f"нет готовых весов {final}: при EPIC_CKPT_FROM обучение не запускается"
+    assert os.environ.get("EPIC_REUSE_V3") != "1", f"нет готовых весов {final}: в режиме EPIC_REUSE_V3 (CPU) обучение не запускается"
     state = torch.load(last, map_location=DEVICE, weights_only=False) if os.path.exists(last) else None
     if state is not None:
         diff = {k: (state["cfg"][k], cfg[k]) for k in cfg if k not in SESSION_KEYS and k in state["cfg"] and state["cfg"][k] != cfg[k]}
