@@ -865,6 +865,9 @@ def blend(a, b, w, how, nmask):
     return w * normalise(a, nmask, how) + (1 - w) * normalise(b, nmask, how)
 
 V2_DIR = find_v2(); BLEND = None
+# EPIC_BLEND="z:0.4" (способ:вес v3) и EPIC_ALPHA="0.7" — задать смесь вручную, когда tune нечестен для v2 (v2 училась на всех контигах вида)
+FORCE_BLEND = os.environ.get("EPIC_BLEND", "")
+FORCE_ALPHA = float(os.environ["EPIC_ALPHA"]) if os.environ.get("EPIC_ALPHA") else None
 if V2_DIR:
     g2 = f"{V2_DIR}/holdout_groups.json"
     same_groups = (not os.path.exists(g2)) or json.load(open(g2)) == GROUPS
@@ -879,9 +882,14 @@ if V2_DIR:
         bg["score"] = bg.AUPRC / bg.AUPRC.max() + bg.Spearman / bg.Spearman.max()
         best = bg.loc[bg.score.idxmax()]; BLEND = dict(how=best.how, w=float(best.w_v3))
         show(bg.round(5), "blend_grid_tune")
-        print("выбрана смесь:", BLEND)
+        if FORCE_BLEND:   # v2 видела tune этого вида: сетка на tune смещена в пользу v2, вес и alpha задаём заранее
+            BLEND = dict(how=FORCE_BLEND.split(":")[0], w=float(FORCE_BLEND.split(":")[1]))
+            print("смесь задана вручную (EPIC_BLEND):", BLEND, "| по tune была бы:", dict(how=best.how, w=float(best.w_v3)))
+        else:
+            print("выбрана смесь:", BLEND)
         tune_bl = blend(HO["tune"]["v3"], V2["tune"], BLEND["w"], BLEND["how"], tn["n"])
         ALPHA, grid_bl = choose_alpha(tune_bl, tn["gt"], tn["n"])
+        if FORCE_ALPHA is not None: ALPHA = FORCE_ALPHA
         show(grid_bl.round(5), "blend_alpha_grid_tune")
         ALPHA_V2, _ = choose_alpha(V2["tune"], tn["gt"], tn["n"])
         rep_bl = blend(rep["v3"], V2["report"], BLEND["w"], BLEND["how"], rep["n"])
