@@ -21,7 +21,7 @@ torch.set_num_threads(os.cpu_count()); torch.manual_seed(0); rng = np.random.def
 t0 = time.time()
 def log(*a): print(f"[{(time.time() - t0) / 60:6.1f} мин]", *a, flush=True)
 
-K, W, UP, DOWN, L = 32, 15, 150, 50, 1000          # мотивов, ширина, окно кривой (-UP..+DOWN), длина куска
+K, W, UP, DOWN, L, CORE = 32, 15, 150, 50, 1000, 10          # мотивов, ширина, окно кривой (-UP..+DOWN), длина куска
 LEFT = W // 2 + UP                                  # сколько букв слева от первой предсказываемой позиции
 RIGHT = W - 1 - W // 2 + DOWN
 STEPS = 60 if SMOKE else 8000
@@ -112,6 +112,7 @@ class MotifNet(nn.Module):
         super().__init__()
         s.motif = nn.Conv1d(4, K, W)
         s.curve = nn.Conv1d(K, 2 * K, UP + DOWN + 1, groups=K, bias=False)   # у мотива k кривые 2k (шанс) и 2k+1 (сила)
+        s.core = nn.Conv1d(4, 2, 2 * CORE + 1, bias=False)   # «логотип» старта: вес каждой буквы в -CORE..+CORE (шанс, сила)
         s.bias = nn.Parameter(torch.zeros(2))
         with torch.no_grad():
             s.motif.weight.mul_(0.3); s.curve.weight.normal_(0, 1e-3)
@@ -122,14 +123,16 @@ class MotifNet(nn.Module):
                 put(k, np.array([[1.0 if b in IUPAC[ch] else -1.0 for ch in cons] for b in "ACGT"], np.float32))
             s.motif.bias[:len(SEEDS) + 1] = -2.0
     def forward(s, x):
-        z = s.curve(Fn.softplus(s.motif(x)))
-        return z.view(z.shape[0], K, 2, -1).sum(1) + s.bias[None, :, None]
+        z = s.curve(Fn.softplus(s.motif(x))); n = z.shape[-1]
+        c = s.core(x)[:, :, LEFT - CORE:LEFT - CORE + n]
+        return z.view(z.shape[0], K, 2, -1).sum(1) + c + s.bias[None, :, None]
     def roughness(s):
-        w = s.curve.weight[:, 0]
-        return ((w[:, 2:] - 2 * w[:, 1:-1] + w[:, :-2]) ** 2).sum()
+        w = s.curve.weight[:, 0]; r = (w[:, 2:] - 2 * w[:, 1:-1] + w[:, :-2]) ** 2
+        r[:, UP - CORE - 1:UP + CORE] = 0                   # в зоне -CORE..+CORE разрешаем острые пики (Inr работает ровно на старте)
+        return r.sum()
 NAMES = ["Inr"] + list(SEEDS) + [f"m{k}" for k in range(len(SEEDS) + 1, K)]
 
-def loss_fn(net, X, Y, lam=30.0):
+def loss_fn(net, X, Y, lam=0.3):
     z = net(X); m = Y >= 0; y = (Y > 0)
     bce = Fn.binary_cross_entropy_with_logits(z[:, 0][m], y[m].float())
     mse = Fn.mse_loss(z[:, 1][y], torch.log1p(Y[y])) if y.any() else z.sum() * 0
@@ -214,7 +217,7 @@ for k in np.argsort(-imp):
                                  "пик кривой, п.н.": int(d[np.argmax(np.abs(cv))]), "знак": "+" if cv[np.argmax(np.abs(cv))] > 0 else "-"})
 res["мотивы"] = info; res["alpha"] = alpha
 json.dump(res, open(f"{OUT}/{SP}.motifnet_summary.json", "w"), ensure_ascii=False, indent=1, default=str)
-np.savez(f"{OUT}/{SP}.motifnet_weights.npz", motif=Wm, motif_bias=net.motif.bias.detach().numpy(), curve=net.curve.weight.detach().numpy()[:, 0], names=NAMES, importance=imp)
+np.savez(f"{OUT}/{SP}.motifnet_weights.npz", core=net.core.weight.detach().numpy(), motif=Wm, motif_bias=net.motif.bias.detach().numpy(), curve=net.curve.weight.detach().numpy()[:, 0], names=NAMES, importance=imp)
 try:
     import matplotlib; matplotlib.use("Agg"); import matplotlib.pyplot as plt
     top = np.argsort(-imp)[:12]; fig, ax = plt.subplots(12, 2, figsize=(11, 22), gridspec_kw={"width_ratios": [1, 3]})
