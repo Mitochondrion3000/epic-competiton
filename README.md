@@ -1,4 +1,6 @@
 # epic-competiton
+
+**Подробный отчёт о проекте: [REPORT.md](REPORT.md).**
 Epic Autosome competition - Large Milkweed Bug leaderboard
 
 ## Ноутбуки

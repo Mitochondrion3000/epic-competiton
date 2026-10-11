@@ -39,3 +39,9 @@ score = FN.predict_positions(models, SEQ["NC_064037.1"], LOW["NC_064037.1"], pos
 
 Готовые сабмиты не хранятся в репозитории (большие файлы): они в Output ноутбуков Kaggle
 `epic-simple-ofas-c` (клоп, шаг 5) и `epic-simple-nem-step6` (*Nematostella*, шаг 6).
+
+## Эксперимент: мотивная модель (шаг 7)
+
+`jaNemVect1.1_motifnet_v1/`, `jaNemVect1.1_motifnet_v2/` — модель «выученные PWM × позиционные кривые» (код: `kaggle/nem_motifnet/run.py`,
+v2 — с логотипом старта −10..+10). Тест Nematostella: v1 0.0043 / 0.165, v2 0.0099 / 0.200 (хуже шага 6). В папках: веса (`.pt`, `.npz`),
+сводка с метриками и списком мотивов, рисунок мотивов и их кривых.
