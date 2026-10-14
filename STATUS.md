@@ -107,6 +107,7 @@
 
 Новые записи сверху. Формат: дата · направление · что сделано · где.
 
+* 2026-10-14 · проект · Kaggle API заработал (200). Статусы: `epic-v2-ft-octopus` running (последний запуск 19:25), `epic-v2-ft-oyster`, `epic-v2-ft-dogfish`, `epic-v2-ofas-moth`, `epic-simple-multi-species` complete. Статус: `GET /api/v1/kernels/status?userName=ivanmitochondrion&kernelSlug=<имя>`.
 * 2026-10-14 · проект · Лидерборд читается без входа: `GET https://epic.autosome.org/api/v1/leaderboard/overview?limit=500` (команды, места по видам). Mitochondrion: общее 16-е; клоп 4, моль 23, устрица 19, акула 21, осьминог 23. Лидер NemoAgents (1-е в 4 видах из 5). Kaggle API по-прежнему 401 (прокси не подставляет креды; нужен токен `KGAT_…` в секрете).
 * 2026-10-14 · проект · Новое окружение: `epic.autosome.org` доступен (API `/api/v1/competition` и `/species` читаются, лидерборд через публичный API не найден: нужен вход GitHub). Kaggle: `www.kaggle.com` доступен, но 401. `KAGGLE_USERNAME`/`KAGGLE_KEY` в окружении нет, `~/.kaggle` пуст. Статусы ядер не получены. Нужно добавить секреты `KAGGLE_USERNAME` и `KAGGLE_KEY` (или `KAGGLE_API_TOKEN`) в окружение.
 * 2026-10-14 · проект · PR #9, #10, #11 влиты в `main` (в #10 разрешён конфликт `.gitignore`). Статусы Kaggle и места на сайте не получены: прокси контейнера блокирует `api.kaggle.com`, страницы лидерборда рисуются скриптом.
