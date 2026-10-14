@@ -1,6 +1,8 @@
 # epic-competiton
 Epic Autosome competition - Large Milkweed Bug leaderboard
 
+**Текущее состояние, планы и как продолжить работу — в [STATUS.md](STATUS.md).**
+
 ## Ноутбуки
 
 | ноутбук | что внутри |
@@ -8,6 +10,8 @@ Epic Autosome competition - Large Milkweed Bug leaderboard
 | `epic_eda_explained(лучший_вариант).ipynb` | EDA датасета Nematostella: геном, реплики, whitelist, пучки позиций, мотивы, PWM-бейзлайн |
 | `epic_pipeline_annotated(лучший_вариант).ipynb` | первый пайплайн: dilated CNN, обучение и сабмит |
 | `epic_v2_model.ipynb` | **новая модель v2** поверх бейзлайна InitiationNet: ансамбль, EMA, attention, головы на реплики, TTA, подбор квантования на hold-out; все параметры и архитектура визуализированы |
+
+Какие модели обучены, с какими тегами и что вошло в каждый сабмит — в [MODELS.md](MODELS.md).
 
 [Открыть v2 в Colab](https://colab.research.google.com/github/Mitochondrion3000/epic-competiton/blob/main/epic_v2_model.ipynb)
 
