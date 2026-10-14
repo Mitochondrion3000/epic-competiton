@@ -1,6 +1,8 @@
 # epic-competiton
 Epic Autosome competition - Large Milkweed Bug leaderboard
 
+**Текущее состояние, планы и как продолжить работу — в [STATUS.md](STATUS.md).**
+
 ## Ноутбуки
 
 | ноутбук | что внутри |
