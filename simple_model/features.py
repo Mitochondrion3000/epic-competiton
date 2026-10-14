@@ -124,6 +124,27 @@ def fit_pwm(pos_windows, bg, pseudo=1.0):
     return pwm
 
 
+# Шаг 7: известные элементы промотора как непрерывный счёт (лучший сайт в позиционном окне, без порога)
+CONT_ELEMENTS = {"tata": ("TATAWAWR", -40, -20), "dpe": ("RGWYV", 26, 34), "mte": ("CSARCSSAAC", 16, 29),
+                 "gcbox": ("GGGCGG", -150, -30), "ccaat": ("CCAAT", -150, -40), "ebox": ("CACGTG", -100, 20)}
+
+
+def consensus_pwm(cons):
+    """Матрица счёта (длина x 4) из IUPAC-консенсуса: разрешённая буква +log2(1/(k*0.25)), остальные -3."""
+    w = np.full((len(cons), 4), -3.0, np.float32)
+    for k, ch in enumerate(cons):
+        for b in IUPAC[ch]: w[k, "ACGT".index(b)] = 2.0 - np.log2(len(IUPAC[ch]))
+    return w
+
+
+def cont_names(params):
+    names = []
+    for m in params.get("tf", []):
+        names += [f"tfmax_{m['name']}{suffix}" for suffix in m["windows"] if suffix != "_1k"]
+    names += [f"cont_{n}" for n in CONT_ELEMENTS]
+    return names + ["regime_inr_dens50", "regime_inr_dens250", "regime_inr_max50", "regime_cpg_dens100", "regime_gc_updown"]
+
+
 def strand_features(o, lw, i, inr_here, inr_other, params):
     """Признаки для индексов i ориентированной последовательности o одной цепи; по одному признаку за раз
     (генератор пар (имя, значения)), чтобы не держать в памяти все дорожки сразу.
@@ -166,10 +187,22 @@ def strand_features(o, lw, i, inr_here, inr_other, params):
         yield f"kmer_{name}", window_sum(motif_hits(o, name), i, a, b)
     # --- мотивы факторов транскрипции из JASPAR/HOCOMOCO (шаг 3): число сайтов со счётом >= порога в окне ---
     for m in params.get("tf", []):
-        hit = score_track(o, np.asarray(m["pwm"], np.float32)) >= m["thr"]
+        sc = score_track(o, np.asarray(m["pwm"], np.float32)); hit = sc >= m["thr"]
         for suffix, (a, b) in m["windows"].items():                 # один мотив может давать признаки в нескольких окнах
             yield f"tf_{m['name']}{suffix}", window_sum(hit, i, a, b)
-        del hit
+            if params.get("cont") and suffix != "_1k":              # шаг 7: непрерывный счёт (без порога) — лучший сайт в окне
+                yield f"tfmax_{m['name']}{suffix}", window_max(sc, i, a, b, fill=-50.0)
+        del hit, sc
+    if params.get("cont"):                                          # шаг 7
+        for name, (cons, a, b) in CONT_ELEMENTS.items():
+            yield f"cont_{name}", window_max(score_track(o, consensus_pwm(cons)), i, a, b, fill=-50.0)
+        q = np.quantile(inr_here[::37], 0.99)                       # режим промотора: плотность Inr-подобных позиций вокруг
+        strong = inr_here >= q
+        yield "regime_inr_dens50", window_sum(strong, i, -50, 50)
+        yield "regime_inr_dens250", window_sum(strong, i, -250, 250)
+        yield "regime_inr_max50", window_max(inr_here, i, -50, 50, fill=-50.0)
+        yield "regime_cpg_dens100", window_sum(cg, i, -100, 100)
+        yield "regime_gc_updown", (window_sum(gc, i, -200, -1) - window_sum(gc, i, 1, 200)) / 200.0
     # --- широкий контекст ±1000 нт (шаг 3) ---
     if params.get("wide"):
         n = np.maximum(window_sum(valid, i, -1000, 1000), 1)
