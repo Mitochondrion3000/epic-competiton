@@ -15,6 +15,18 @@ Epic Autosome competition - Large Milkweed Bug leaderboard
 
 [Открыть v2 в Colab](https://colab.research.google.com/github/Mitochondrion3000/epic-competiton/blob/main/epic_v2_model.ipynb)
 
+## v3: мультивидовой BPNet + ансамбль с v2 (`epic_v3_bpnet.ipynb`)
+
+* Архитектура BPNet/ProCapNet: dilated CNN и две головы — «профиль» (где в окне старт, softmax + кросс-энтропия)
+  и «счёт» (сколько прочтений в окне, MSE по log1p). Предсказание в позиции = счёт × доля профиля.
+* Тело общее для всех видов, головы свои у каждого вида. По умолчанию учимся на клопе `Ofas_2.0`
+  плюс моль, устрица и Nematostella (переменные `EPIC_SPECIES`, `EPIC_AUX`).
+* Если рядом лежат предсказания v2 (`holdout_*_lograte.npy`, `test_lograte.npy`, `holdout_groups.json`: их теперь сохраняет v2),
+  v3 подбирает смесь на группе tune, проверяет на report и делает сабмит из смеси.
+* Ноутбук генерируется скриптом: правки вносить в `tools/build_v3_notebook.py`, затем `python3 tools/build_v3_notebook.py`.
+
+Запуск на Kaggle: GPU T4 x2, Internet On, Run All. Для проверки кода: `EPIC_FAST_DEV=1 EPIC_SPECIES=jaNemVect1.1 EPIC_AUX=ilPloInte3.2`.
+
 ## Простая интерпретируемая модель (папка `simple_model/`)
 
 Пошаговая серия: понятные биологические признаки из последовательности → таблица → простая модель.
