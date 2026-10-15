@@ -1,7 +1,7 @@
 # Состояние проекта EPIC
 
 Единая точка входа: что делаем, где лежит, что дальше. Обновляется после каждого завершённого шага (см. «Правило обновления»).
-Подробные реестры: [MODELS.md](MODELS.md) (модели v2), `SUBMISSIONS.md` и `REPORT.md` в рабочих ветках (ссылки ниже).
+Подробные реестры: [MODELS.md](MODELS.md) (модели v2), [submissions.md](submissions.md) (все файлы сабмитов, датасет `ivanmitochondrion/epic-submissions`), `SUBMISSIONS.md` и `REPORT.md` в рабочих ветках (ссылки ниже).
 
 **Последнее обновление:** 2026-10-14 (PR #9–#11 влиты в `main`; Kaggle и сайт из контейнера недоступны)
 
@@ -110,6 +110,7 @@
 
 Новые записи сверху. Формат: дата · направление · что сделано · где.
 
+* 2026-10-15 · проект · Инвентаризация сабмитов: 56 уникальных `predictions*.txt.gz` из Output ядер обоих аккаунтов (4.3 ГБ) собраны в приватный датасет `ivanmitochondrion/epic-submissions` (`вид__ядро__вариант.txt.gz`), таблица в `submissions.md`. Старый `epic-predictions` дублирует его и ждёт решения об удалении (список отправлен пользователю, без «да» ничего не удаляется).
 * 2026-10-15 · v2 · Завершились `k13polinaa/epic-v2-ft2-oyster` (report 0.120 / 0.316; ft 24k было 0.109 / 0.322) и `epic-v2-ft2-dogfish` (0.102 / 0.335; было 0.078 / 0.376): 48k шагов подняли AUPRC, Spearman просел. `ivanmitochondrion/epic-v2-ft-octopus` complete: report 0.078 / 0.237 (v3 было 0.063 / 0.198): файл `epic_runs/ASM119413v2/ASM119413v2.predictions.txt.gz` готов к загрузке. Запущены `k13polinaa/epic-v2-ft2-octopus` и `epic-v2-ft2-moth`. `epic-v2-ofas-big` ещё running.
 * 2026-10-15 · проект · Разбор ошибок готов: `ERROR_ANALYSIS.md` (v2 клоп hold-out и простая модель на тесте Nematostella). Ядра `epic-v2-error-lite`, `epic-simple-error-nem` завершились с ошибкой в самом конце печати (`df.gt`), файлы результата сохранены; опечатка исправлена в скриптах. Главное: основные потери на слабых (счёт 1–2) и одиночных стартах; GC пропуски не объясняет. Идея интерпретируемой модели не получена. Долгое `epic-v2-error-analysis` (CPU-инференс) остановить не удалось/не нужно.
 * 2026-10-15 · проект · Разбор ошибок: готовые hold-out предсказания клопа есть (`ivanmitochondrion/epic-v2-ofas-moth` → `report_preds_v2moth.npy`; v3: `k13polinaa/epic-v3-ofas` → `v3_holdout_report_lograte.npy`). Запущены CPU-ядра `epic-v2-error-lite` (v2, по готовому файлу), `epic-simple-error-nem` (простая модель на тесте Nematostella с открытыми метками, `tools/error_analysis_nem.py`). Долгое `epic-v2-error-analysis` (инференс на CPU) избыточно. Результатов пока нет.
