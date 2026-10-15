@@ -60,6 +60,6 @@ for g, ref in (("FN", "TP"), ("FP", "BG")):
     for f in num[:5]: s.loc[f, f"p({g} vs {ref})"] = mannwhitneyu(df[df.grp == g][f].dropna(), df[df.grp == ref][f].dropna()).pvalue
 s.to_csv(f"{OUT}/error_analysis_nem.csv"); print(s.round(4).to_string())
 print(pd.crosstab(df.dinuc, df.grp, normalize="columns").round(3).sort_values("TP", ascending=False).head(10).to_string())
-df["gt_bin"] = pd.cut(df.gt, [-1, 0, 1, 2, 4, 9, 49, 1e9]); t = df[df.grp.isin(["FN", "TP"])]
+df["gt_bin"] = pd.cut(df["gt"], [-1, 0, 1, 2, 4, 9, 49, 1e9]); t = df[df.grp.isin(["FN", "TP"])]
 print("доля FN по силе:\n", t.groupby("gt_bin", observed=True).grp.apply(lambda x: (x == "FN").mean()).round(3).to_string())
 print("доля FN по контигам:\n", t.groupby("chrom").grp.apply(lambda x: (x == "FN").mean()).round(3).head(15).to_string())
