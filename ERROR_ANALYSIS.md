@@ -1,5 +1,7 @@
 # Разбор ошибок (2026-10-15)
 
+> Актуальный отчёт с графиками и методикой: [notebooks/epic_error_analysis.ipynb](notebooks/epic_error_analysis.ipynb). Этот файл — первый черновик.
+
 Группы: **TP** — старты среди верхних N по предсказанию (N = число стартов); **FN** — старты вне верхних N; **FP** — верхние N без старта; **BG** — случайный фон.
 Скрипты: `tools/error_analysis_cell.py` (v2, клоп), `tools/error_analysis_nem.py` (простая модель, тест Nematostella с открытыми метками).
 
