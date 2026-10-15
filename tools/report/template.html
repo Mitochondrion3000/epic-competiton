@@ -1,0 +1,255 @@
+<title>Разбор ошибок EPIC</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* Layout: одна колонка 1080px, секция = заголовок, метод, график, вывод, ссылка на код. Палитра: валидированная референсная (синий/оранжевый/аква + нейтральный серый для фона). */
+:root{--bg:#fafaf8;--panel:#ffffff;--fg:#1b1b1a;--fg2:#55544f;--muted:#8a8982;--line:#e4e3de;--grid:#eceae5;
+--c1:#2a78d6;--c2:#eb6834;--c3:#1baf7a;--c4:#eda100;--gray:#8d8c86;--accent:#2a78d6;--code:#f1f0ec}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#151514;--panel:#1d1d1b;--fg:#f0efec;--fg2:#c3c2b7;--muted:#8f8e86;--line:#33322f;--grid:#2a2926;
+--c1:#3987e5;--c2:#d95926;--c3:#199e70;--c4:#c98500;--gray:#8d8c86;--accent:#3987e5;--code:#262624;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#151514;--panel:#1d1d1b;--fg:#f0efec;--fg2:#c3c2b7;--muted:#8f8e86;--line:#33322f;--grid:#2a2926;
+--c1:#3987e5;--c2:#d95926;--c3:#199e70;--c4:#c98500;--gray:#8d8c86;--accent:#3987e5;--code:#262624;color-scheme:dark}
+body{background:var(--bg);color:var(--fg);font:15px/1.55 "IBM Plex Sans",system-ui,sans-serif;padding-block:28px 60px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+main{max-width:1080px;margin:0 auto;display:flex;flex-direction:column;gap:36px}
+h1{font:600 28px/1.2 "IBM Plex Sans",system-ui,sans-serif;margin:0;text-wrap:balance}
+h2{font:600 20px/1.3 "IBM Plex Sans",system-ui,sans-serif;margin:0 0 8px;text-wrap:balance}
+h3{font:600 14px/1.3 "IBM Plex Sans",system-ui,sans-serif;margin:0 0 6px;color:var(--fg2);text-transform:uppercase;letter-spacing:.06em}
+p{margin:0 0 8px;max-width:75ch}.lead{color:var(--fg2);font-size:16px}
+code,.mono{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:12.5px}
+code{background:var(--code);padding:1px 5px;border-radius:3px}
+a{color:var(--accent)}
+section{display:flex;flex-direction:column;gap:10px;min-width:0}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:14px 16px;min-width:0}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,480px),1fr));gap:14px}
+.grid4{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr));gap:12px}
+.method{border-left:3px solid var(--line);padding:2px 0 2px 12px;color:var(--fg2);font-size:13.5px;max-width:80ch}
+.method b{color:var(--fg)}
+.finding{font-weight:500}.src{font-size:12.5px;color:var(--muted)}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{text-align:left;padding:5px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+th{color:var(--fg2);font-weight:600;white-space:nowrap}
+.tw{overflow-x:auto}
+td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
+svg{display:block;width:100%;height:auto;overflow:visible}
+svg text{fill:var(--fg2);font:11px "IBM Plex Sans",system-ui,sans-serif}
+svg .t2{fill:var(--fg);font-weight:600}
+svg .grid{stroke:var(--grid);stroke-width:1}svg .ax{stroke:var(--muted);stroke-width:1}
+.legend{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12.5px;color:var(--fg2);margin-bottom:6px}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+.tabs{display:flex;gap:6px;flex-wrap:wrap}.tabs button{font:inherit;font-size:12.5px;padding:3px 10px;border:1px solid var(--line);background:var(--panel);color:var(--fg2);border-radius:4px;cursor:pointer}
+.tabs button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:#fff}
+.tabs button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+#tip{position:fixed;pointer-events:none;background:var(--fg);color:var(--bg);padding:5px 8px;border-radius:4px;font-size:12px;line-height:1.35;z-index:9;max-width:260px;display:none}
+.sw{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px}
+ul.f{margin:0;padding-left:20px}ul.f li{margin-bottom:4px;max-width:80ch}
+</style>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400&display=swap">
+<main>
+<header><h1>Где мы ошибаемся: разбор предсказаний EPIC</h1>
+<p class="lead">Клоп <i>Ofas_2.0</i> (модель v2, hold-out) и Nematostella <i>jaNemVect1.1</i> (простая интерпретируемая модель, тест с открытыми метками). Все числа ниже посчитаны скриптами из репозитория; у каждого графика указан метод и ссылка на код.</p></header>
+
+<section id="models"><h2>Модели и данные</h2>
+<div class="card tw"><table>
+<tr><th></th><th>v2 (клоп)</th><th>Простая модель (Nematostella)</th></tr>
+<tr><th>Модель</th><td>InitiationNetV2, 7.88 млн параметров (свёртки + attention), 2 сида; обучена совместно на <i>Ofas_2.0</i> и моли <i>ilPloInte3.2</i> (тег <code>v2moth</code>)</td><td>Шаг 6 интерпретируемой модели: LightGBM (классификатор + регрессор, 3 сида) на признаках: логотип ±, динуклеотиды, мотивы, GC/CpG</td></tr>
+<tr><th>Код модели</th><td><a href="https://github.com/Mitochondrion3000/epic-competiton/blob/main/epic_v2_model.ipynb">epic_v2_model.ipynb</a>, MODELS.md</td><td><a href="https://github.com/Mitochondrion3000/epic-competiton/blob/main/simple_model/step6_final.ipynb">simple_model/step6_final.ipynb</a>, <a href="https://github.com/Mitochondrion3000/epic-competiton/blob/main/kaggle/nem_step6/run.py">kaggle/nem_step6/run.py</a></td></tr>
+<tr><th>Откуда предсказания</th><td>Kaggle, ядро <code>ivanmitochondrion/epic-v2-ofas-moth</code>, файл <code>epic_runs/Ofas_2.0/report_preds_v2moth.npy</code> (2 × 68 159 634 лог-ставки; усредняем 2 модели)</td><td>Kaggle, ядро <code>ivanmitochondrion/epic-simple-nem-step6</code>, файл <code>jaNemVect1.1.simple_model_final.predictions.txt.gz</code></td></tr>
+<tr><th>Откуда метки</th><td>Обучающие метки csRNA-seq <i>Ofas_2.0</i> (Zenodo 22285753), реплики r1+r2 суммируются; позиции вне N</td><td>Метки теста <code>ground_truth/csRNA-test.txt.gz</code> из архива <i>jaNemVect1.1.tgz</i> (Zenodo 22285753), маски <code>scoring/mask1/2-test</code></td></tr>
+<tr><th>Сплит</th><td>Группа <b>report</b>: контиги, отложенные от обучения (5% whitelist, ≈ 34 Мб × 2 цепи); обе модели их не видели</td><td>Тест целиком (позиции, попадающие в mask1 или mask2), модель обучена только на train</td></tr>
+<tr><th>Размер</th><td>старт-позиций <b id="v2N"></b>, оценено позиций <b id="v2S"></b></td><td>старт-позиций <b id="nemN"></b>, оценено позиций <b id="nemS"></b></td></tr>
+<tr><th>Метрика модели</th><td>report: AUPRC 0.209, Spearman 0.503 (альфа настроена на tune)</td><td>тест: AUPRC 0.0332, Spearman 0.291 (STATUS.md)</td></tr>
+</table></div>
+<p class="src">Модели разные и на разных видах, поэтому сравниваем только характер ошибок, не уровень метрик.</p></section>
+
+<section id="defs"><h2>Как определены группы</h2>
+<div class="method"><b>N</b> = число стартов (позиций со счётом &gt; 0, среди оцениваемых). Берём N позиций с наибольшим предсказанием («верхние N»).
+<b>TP</b>: старт попал в верхние N. <b>FN</b>: старт вне верхних N (пропуск). <b>FP</b>: позиция из верхних N без старта (ложное срабатывание). <b>BG</b>: случайные оцениваемые позиции без старта и вне верхних N.
+При допуске <b>±k</b> старт считается найденным, если в верхних N есть позиция в пределах k нт (фильтр по вектору позиций; на границах интервалов возможна небольшая утечка).
+Для признаков по последовательности берём случайные выборки до 20 000 позиций на группу; окно ±100 нт в направлении цепи.</div>
+<p class="src"><a id="lk_defs" href="#">Код: определения групп</a></p></section>
+
+<section id="s_findings"><h2>Что мы нашли</h2><ul class="f" id="findings"></ul></section>
+
+<section id="s_tol"><h2>1. Допуск по позиции: сколько пропусков — это промах на пару нуклеотидов</h2>
+<div class="method"><b>Метод.</b> Для каждого k ∈ {0,1,2,5,10,20}: recall = доля стартов, рядом с которыми (±k) есть позиция из верхних N; precision = доля верхних N, рядом с которыми есть старт. Все оцениваемые позиции, без подвыборки.</div>
+<div class="card"><div class="legend" id="lg_tol"></div><div id="ch_tol"></div></div>
+<p class="finding" id="t_tol"></p><p class="src"><a id="lk_tol" href="#">Код</a></p></section>
+
+<section id="s_str"><h2>2. Пропуски зависят от силы старта</h2>
+<div class="method"><b>Метод.</b> Старты делятся на бины по суммарному счёту реплик. В каждом бине доля пропущенных = 1 − (найдено)/(стартов), строго (k=0) и с допуском ±5 нт. n у каждого столбца: число стартов в бине (подсказка при наведении). Без подвыборки.</div>
+<div class="grid2"><div class="card"><h3>v2, клоп</h3><div class="legend" id="lg_str"></div><div id="ch_str_v2"></div></div>
+<div class="card"><h3>Простая модель, Nematostella</h3><div class="legend" id="lg_str2"></div><div id="ch_str_nem"></div></div></div>
+<p class="finding" id="t_str"></p><p class="src"><a id="lk_str" href="#">Код</a></p></section>
+
+<section id="s_cl"><h2>3. Одиночные и кластерные старты</h2>
+<div class="method"><b>Метод.</b> Для каждого старта считаем число других стартов в ±50 нт (накопленные суммы по вектору позиций). Группы: 0 (одиночный), 1–3, 4–10, 11+. Доля пропусков как выше.</div>
+<div class="grid2"><div class="card"><h3>v2, клоп</h3><div id="ch_cl_v2"></div></div><div class="card"><h3>Простая модель, Nematostella</h3><div id="ch_cl_nem"></div></div></div>
+<p class="finding" id="t_cl"></p><p class="src"><a id="lk_cl" href="#">Код</a></p></section>
+
+<section id="s_pr"><h2>4. Кривые precision–recall</h2>
+<div class="method"><b>Метод.</b> Все старты + случайные 2 млн не-стартов с весом (число негативов / 2 млн); позиции сортируются по предсказанию, считаются взвешенные TP и FP. Показано 400 точек. Горизонтальные линии: доля стартов среди оцениваемых позиций (случайный уровень). AUPRC здесь строгий, по позициям, поэтому ниже официального.</div>
+<div class="card"><div class="legend" id="lg_pr"></div><div id="ch_pr"></div></div>
+<p class="finding" id="t_pr"></p><p class="src"><a id="lk_pr" href="#">Код</a></p></section>
+
+<section id="s_pred"><h2>5. Предсказание против реального счёта</h2>
+<div class="method"><b>Метод.</b> Предсказание переводится в перцентиль среди всех оцениваемых позиций (по 1 млн случайных значений). Для каждого бина счёта (0 = нет старта) берём до 200 000 позиций; слева — квантили 5/25/50/75/95%, справа — распределение перцентиля (20 столбцов), доля внутри строки.</div>
+<div class="grid2"><div class="card"><h3>v2: перцентиль предсказания по бинам счёта</h3><div id="ch_box_v2"></div></div><div class="card"><h3>Простая модель</h3><div id="ch_box_nem"></div></div></div>
+<div class="grid2"><div class="card"><h3>v2: распределение перцентиля (тепловая карта)</h3><div id="ch_hm_v2"></div></div><div class="card"><h3>Простая модель</h3><div id="ch_hm_nem"></div></div></div>
+<p class="finding" id="t_pred"></p><p class="src"><a id="lk_pred" href="#">Код</a></p></section>
+
+<section id="s_feat"><h2>6. Признаки последовательности: TP, FN, FP и фон</h2>
+<div class="method"><b>Метод.</b> Окно ±100 нт вокруг позиции (в направлении цепи). GC — доля G+C; CpG o/e = CpG / (C·G/длина); «строчные» — доля нуклеотидов в мягко замаскированных повторах (строчные буквы fasta); энтропия 3-меров (бит; меньше = проще последовательность); соседние старты в ±50. Для сравнения групп — тест Манна–Уитни (p) и AUC = P(значение в первой группе &gt; во второй); AUC≈0.5 нет различий.</div>
+<div class="tabs" id="tb_feat"></div>
+<div class="legend" id="lg_feat"></div>
+<div class="grid2"><div class="card"><h3>v2, клоп</h3><div id="ch_ft_v2"></div></div><div class="card"><h3>Простая модель, Nematostella</h3><div id="ch_ft_nem"></div></div></div>
+<div class="card tw"><h3>Медианы и сравнения групп</h3><div id="tb_feat_tbl"></div></div>
+<p class="finding" id="t_feat"></p><p class="src"><a id="lk_feat" href="#">Код</a></p></section>
+
+<section id="s_nuc"><h2>7. Нуклеотиды вокруг позиции старта (−10…+10)</h2>
+<div class="method"><b>Метод.</b> Частота A, C, G, T в каждой из 21 позиции окна (направление цепи, 0 = позиция старта) в выборке каждой группы; окна со строчными буквами (повторы) или N пропущены, поэтому n меньше размера группы. Размеры выборок под заголовками.</div>
+<div class="tabs" id="tb_nuc"></div><div class="legend" id="lg_nuc"></div>
+<div class="grid4" id="ch_nuc"></div>
+<h3 style="margin-top:8px">Пара «предыдущий нт + нт старта»</h3><div class="card"><div class="legend" id="lg_di"></div><div id="ch_di"></div></div>
+<p class="finding" id="t_nuc"></p><p class="src"><a id="lk_nuc" href="#">Код</a></p></section>
+
+<section id="s_fix"><h2>Что можно исправить</h2><ul class="f" id="fixes"></ul>
+<p class="src">Ограничения: анализ по позициям, а не по пикам; строгий критерий «верхние N»; v2 — только hold-out клопа (2 сида, не ансамбль из 4); простая модель — отдельный вид. Идея интерпретируемой модели от пользователя в разбор не вошла (текст не получен).</p></section>
+</main>
+<div id="tip"></div>
+<script>
+const D=/*DATA*/null;const LINKS=/*LINKS*/null;
+const $=id=>document.getElementById(id);
+const NS="http://www.w3.org/2000/svg";
+const css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const COL={TP:"var(--c1)",FN:"var(--c2)",FP:"var(--c3)",BG:"var(--gray)",A:"var(--c1)",C:"var(--c2)",G:"var(--c3)",T:"var(--c4)"};
+const NAMES={TP:"TP (найден)",FN:"FN (пропущен)",FP:"FP (ложный)",BG:"фон"};
+const fmt=(x,d=1)=>(x*100).toFixed(d)+"%";const num=x=>x.toLocaleString("ru");
+const tip=$("tip");
+function showTip(e,h){tip.innerHTML=h;tip.style.display="block";const w=tip.offsetWidth;let x=e.clientX+12;if(x+w>innerWidth-8)x=e.clientX-w-12;tip.style.left=Math.max(4,x)+"px";tip.style.top=(e.clientY+12)+"px"}
+function hideTip(){tip.style.display="none"}
+function el(n,a,p,t){const e=document.createElementNS(NS,n);for(const k in a)e.setAttribute(k,a[k]);if(t!=null)e.textContent=t;if(p)p.appendChild(e);return e}
+function hov(e,html){e.addEventListener("pointermove",ev=>showTip(ev,html));e.addEventListener("pointerleave",hideTip)}
+function legend(id,items){$(id).innerHTML=items.map(([n,c])=>`<span><i style="background:${c}"></i>${n}</span>`).join("")}
+function frame(host,W,H,m){const s=el("svg",{viewBox:`0 0 ${W} ${H}`,role:"img"});$(host).innerHTML="";$(host).appendChild(s);return s}
+function scale(d0,d1,r0,r1){return v=>r0+(v-d0)/(d1-d0)*(r1-r0)}
+function ticks(a,b,n){const st=(b-a)/n,p=Math.pow(10,Math.floor(Math.log10(st))),f=st/p,s=(f<1.5?1:f<3.5?2:f<7.5?5:10)*p,o=[];for(let v=Math.ceil(a/s)*s;v<=b+1e-9;v+=s)o.push(+v.toFixed(10));return o}
+function axes(s,W,H,m,xs,ys,xt,yt,xl,yl,xf=v=>v,yf=v=>v){
+ yt.forEach(v=>{el("line",{x1:m.l,x2:W-m.r,y1:ys(v),y2:ys(v),class:"grid"},s);el("text",{x:m.l-6,y:ys(v)+4,"text-anchor":"end"},s,yf(v))});
+ xt.forEach(v=>el("text",{x:xs(v),y:H-m.b+15,"text-anchor":"middle"},s,xf(v)));
+ el("line",{x1:m.l,x2:W-m.r,y1:H-m.b,y2:H-m.b,class:"ax"},s);
+ if(xl)el("text",{x:(m.l+W-m.r)/2,y:H-4,"text-anchor":"middle"},s,xl);
+ if(yl)el("text",{transform:`translate(12,${(m.t+H-m.b)/2}) rotate(-90)`,"text-anchor":"middle"},s,yl)}
+function lines(host,{series,W=620,H=300,xlabel,ylabel,xmin,xmax,ymin,ymax,xf,yf,xt,yt,log,dots,hlines=[]}){
+ const m={l:68,r:14,t:10,b:36},s=frame(host,W,H,m),xs=scale(xmin,xmax,m.l,W-m.r),ys=log?(v=>{const a=Math.log10(ymin),b=Math.log10(ymax);return H-m.b-(Math.log10(Math.max(v,ymin))-a)/(b-a)*(H-m.b-m.t)}):scale(ymin,ymax,H-m.b,m.t);
+ axes(s,W,H,m,xs,ys,xt||ticks(xmin,xmax,6),yt||ticks(ymin,ymax,5),xlabel,ylabel,xf,yf);
+ hlines.forEach(h=>{el("line",{x1:m.l,x2:W-m.r,y1:ys(h.y),y2:ys(h.y),stroke:h.color,"stroke-dasharray":"4 3","stroke-width":1.2},s);el("text",{x:W-m.r-2,y:ys(h.y)-4-(h.dy||0),"text-anchor":"end"},s,h.label)});
+ series.forEach(S=>{el("path",{d:S.x.map((x,i)=>(i?"L":"M")+xs(x).toFixed(1)+" "+ys(S.y[i]).toFixed(1)).join(""),fill:"none",stroke:S.color,"stroke-width":2,"stroke-linejoin":"round"},s);
+  if(dots)S.x.forEach((x,i)=>{const c=el("circle",{cx:xs(x),cy:ys(S.y[i]),r:4,fill:S.color,stroke:"var(--panel)","stroke-width":2},s);hov(c,`${S.name}<br>${xlabel||"x"}: <b>${xf?xf(x):x}</b><br>${ylabel||"y"}: <b>${yf?yf(S.y[i]):S.y[i].toFixed(3)}</b>`)})});
+ if(!dots){const ov=el("rect",{x:m.l,y:m.t,width:W-m.l-m.r,height:H-m.t-m.b,fill:"transparent"},s);ov.addEventListener("pointermove",ev=>{const r=s.getBoundingClientRect(),px=(ev.clientX-r.left)/r.width*W,xv=xmin+(px-m.l)/(W-m.l-m.r)*(xmax-xmin);
+  let h=`${xlabel||"x"}: <b>${xf?xf(xv):xv.toFixed(2)}</b>`;series.forEach(S=>{let b=0,bd=1e9;S.x.forEach((x,i)=>{const d=Math.abs(x-xv);if(d<bd){bd=d;b=i}});h+=`<br><span class="sw" style="background:${S.color}"></span>${S.name}: <b>${yf?yf(S.y[b]):S.y[b].toFixed(3)}</b>`});showTip(ev,h)});ov.addEventListener("pointerleave",hideTip)}}
+function bars(host,{cats,series,W=560,H=300,max=1,ylabel,yf=v=>fmt(v,0),tipf}){
+ const m={l:46,r:10,t:10,b:44},s=frame(host,W,H,m),ys=scale(0,max,H-m.b,m.t),gw=(W-m.l-m.r)/cats.length;
+ axes(s,W,H,m,v=>v,ys,[],ticks(0,max,5),null,ylabel,v=>v,yf);
+ const bw=Math.min(26,(gw-12)/series.length-2);
+ cats.forEach((c,i)=>{const cx=m.l+gw*(i+.5);el("text",{x:cx,y:H-m.b+15,"text-anchor":"middle"},s,c);
+  series.forEach((S,j)=>{const x=cx+(j-(series.length-1)/2)*(bw+2)-bw/2,y=ys(S.vals[i]),r=el("rect",{x,y,width:bw,height:Math.max(0,H-m.b-y),fill:S.color,rx:2},s);
+   el("text",{x:x+bw/2,y:y-4,"text-anchor":"middle"},s,yf(S.vals[i]));hov(r,tipf?tipf(i,j):`${c}<br>${S.name}: <b>${yf(S.vals[i])}</b>`)})});
+ if(cats.sub)cats.sub.forEach((t,i)=>el("text",{x:m.l+gw*(i+.5),y:H-m.b+28,"text-anchor":"middle",style:"fill:var(--muted)"},s,t))}
+function boxes(host,rows){
+ const W=560,H=300,m={l:46,r:10,t:10,b:44},s=frame(host,W,H,m),ys=scale(0,1,H-m.b,m.t),gw=(W-m.l-m.r)/rows.length;
+ axes(s,W,H,m,v=>v,ys,[],[0,.25,.5,.75,1],null,"перцентиль предсказания",v=>v,v=>(v*100)+"%");
+ rows.forEach((r,i)=>{const cx=m.l+gw*(i+.5),q=r.q;el("text",{x:cx,y:H-m.b+15,"text-anchor":"middle"},s,r.label);
+  el("line",{x1:cx,x2:cx,y1:ys(q[0]),y2:ys(q[4]),stroke:"var(--c1)","stroke-width":1.5},s);
+  const b=el("rect",{x:cx-11,y:ys(q[3]),width:22,height:Math.max(1,ys(q[1])-ys(q[3])),fill:"var(--c1)","fill-opacity":.35,stroke:"var(--c1)",rx:2},s);
+  el("line",{x1:cx-11,x2:cx+11,y1:ys(q[2]),y2:ys(q[2]),stroke:"var(--c1)","stroke-width":3},s);
+  hov(b,`счёт ${r.label}<br>5%: ${fmt(q[0],0)} · 25%: ${fmt(q[1],0)}<br>медиана: <b>${fmt(q[2],0)}</b><br>75%: ${fmt(q[3],0)} · 95%: ${fmt(q[4],0)}`)});
+ el("text",{x:W/2,y:H-4,"text-anchor":"middle"},s,"реальный счёт старта (0 = нет старта)")}
+function heat(host,hd){
+ const W=560,H=300,m={l:60,r:10,t:10,b:36},s=frame(host,W,H,m),R=hd.rows.length,C=hd.cols,cw=(W-m.l-m.r)/C,rh=(H-m.t-m.b)/R;
+ let mx=0;hd.z.forEach(r=>r.forEach(v=>mx=Math.max(mx,v)));
+ hd.z.forEach((r,i)=>{el("text",{x:m.l-6,y:m.t+rh*(i+.5)+4,"text-anchor":"end"},s,hd.rows[i]);r.forEach((v,j)=>{const t=Math.sqrt(v/mx);
+  const c=el("rect",{x:m.l+cw*j,y:m.t+rh*i,width:cw-1,height:rh-1,fill:"var(--c1)","fill-opacity":(.06+.94*t).toFixed(3)},s);hov(c,`счёт ${hd.rows[i]}<br>перцентиль ${(j*5)}–${(j*5+5)}%<br>доля строки: <b>${fmt(v,1)}</b>`)})});
+ [0,.25,.5,.75,1].forEach(v=>el("text",{x:m.l+(W-m.l-m.r)*v,y:H-m.b+15,"text-anchor":"middle"},s,(v*100)+"%"));
+ el("text",{x:(m.l+W-m.r)/2,y:H-4,"text-anchor":"middle"},s,"перцентиль предсказания")}
+function histPlot(host,fd,groups,W=520,H=250){
+ const m={l:44,r:10,t:10,b:34},s=frame(host,W,H,m),[lo,hi]=fd.range;let mx=0;groups.forEach(g=>fd.hist[g].forEach(v=>mx=Math.max(mx,v)));
+ const xs=scale(lo,hi,m.l,W-m.r),ys=scale(0,mx*1.08,H-m.b,m.t);axes(s,W,H,m,xs,ys,ticks(lo,hi,5),ticks(0,mx,4),null,"доля группы",v=>v,v=>(v*100).toFixed(0)+"%");
+ groups.forEach(g=>{const h=fd.hist[g],bw=(W-m.l-m.r)/h.length;let d="M"+xs(lo)+" "+ys(0);h.forEach((v,i)=>{d+=`L${m.l+bw*i} ${ys(v)}L${m.l+bw*(i+1)} ${ys(v)}`});
+  el("path",{d:d+`L${W-m.r} ${ys(0)}`,fill:"none",stroke:COL[g],"stroke-width":2},s);
+  const x=xs(fd.median[g]);el("line",{x1:x,x2:x,y1:H-m.b,y2:H-m.b+6,stroke:COL[g],"stroke-width":3},s)});
+ const ov=el("rect",{x:m.l,y:m.t,width:W-m.l-m.r,height:H-m.t-m.b,fill:"transparent"},s);
+ ov.addEventListener("pointermove",ev=>{const r=s.getBoundingClientRect(),px=(ev.clientX-r.left)/r.width*W,f=(px-m.l)/(W-m.l-m.r),b=Math.min(29,Math.max(0,Math.floor(f*30)));
+  let h=`значение ${(lo+(hi-lo)*b/30).toFixed(2)}–${(lo+(hi-lo)*(b+1)/30).toFixed(2)}`;groups.forEach(g=>h+=`<br><span class="sw" style="background:${COL[g]}"></span>${g}: <b>${fmt(fd.hist[g][b],1)}</b>`);showTip(ev,h)});ov.addEventListener("pointerleave",hideTip)}
+const FN={gc:"GC в ±100",cpg_oe:"CpG o/e",lower:"доля строчных (повторы)",ent3:"энтропия 3-меров",n_starts_pm50:"соседние старты в ±50"};
+const GR=["TP","FN","FP","BG"];
+function render(){
+ const V=D.v2,Nn=D.nem;
+ $("v2N").textContent=num(V.meta.N_starts);$("v2S").textContent=num(V.meta.N_scored);$("nemN").textContent=num(Nn.meta.N_starts);$("nemS").textContent=num(Nn.meta.N_scored);
+ for(const k in LINKS){const a=$("lk_"+k);if(a){a.href=LINKS[k].url;a.textContent="Код: "+LINKS[k].label}}
+ // 1 tolerance
+ const tk=d=>d.tolerance.map(t=>t.k);
+ const tolSeries=[["v2 recall","v2",V,"recall","var(--c1)"],["v2 precision","v2",V,"precision","var(--c3)"],["простая recall","nem",Nn,"recall","var(--c2)"],["простая precision","nem",Nn,"precision","var(--c4)"]].map(([n,_,d,k,c])=>({name:n,color:c,x:tk(d),y:d.tolerance.map(t=>t[k])}));
+ legend("lg_tol",tolSeries.map(s=>[s.name,s.color]));
+ lines("ch_tol",{series:tolSeries,xlabel:"допуск ±k, нт",ylabel:"доля",xmin:0,xmax:20,ymin:0,ymax:Math.max(...tolSeries.flatMap(s=>s.y))*1.1,xf:v=>Math.round(v),yf:v=>fmt(v,1),dots:true,xt:[0,1,2,5,10,20]});
+ const t0=V.tolerance[0],t5=V.tolerance[3],n0=Nn.tolerance[0],n5=Nn.tolerance[3];
+ $("t_tol").textContent=`v2: найдено ${fmt(t0.recall,0)} стартов строго и ${fmt(t5.recall,0)} при допуске ±5 нт. Простая модель: ${fmt(n0.recall,0)} и ${fmt(n5.recall,0)}. Допуск по позиции отвечает за часть пропусков, но не за основную.`;
+ // 2 strength
+ const labs=V.strength.map(b=>b.label),sub=V.strength.map(b=>"n="+num(b.n));labs.sub=sub;const labs2=Nn.strength.map(b=>b.label);labs2.sub=Nn.strength.map(b=>"n="+num(b.n));
+ legend("lg_str",[["строго (k=0)","var(--c1)"],["допуск ±5 нт","var(--c3)"]]);legend("lg_str2",[["строго (k=0)","var(--c1)"],["допуск ±5 нт","var(--c3)"]]);
+ const bs=(d,l)=>({cats:l,series:[{name:"строго",color:"var(--c1)",vals:d.strength.map(b=>b.fn_k0)},{name:"±5 нт",color:"var(--c3)",vals:d.strength.map(b=>b.fn_k5)}],ylabel:"доля пропущенных стартов",tipf:(i,j)=>`счёт ${l[i]}<br>старт в бине: ${num(d.strength[i].n)}<br>пропущено: <b>${fmt(j?d.strength[i].fn_k5:d.strength[i].fn_k0,1)}</b>`});
+ bars("ch_str_v2",bs(V,labs));bars("ch_str_nem",bs(Nn,labs2));
+ const f=d=>d.strength[0].fn_k0,l=d=>d.strength[d.strength.length-1].fn_k0;
+ $("t_str").textContent=`Счёт 1: пропущено ${fmt(f(V),0)} (v2) и ${fmt(f(Nn),0)} (простая). Счёт 50+: ${fmt(l(V),0)} и ${fmt(l(Nn),0)}. Доля старта со счётом 1: ${fmt(V.meta.n_gt1/V.meta.N_starts,0)} (v2), ${fmt(Nn.meta.n_gt1/Nn.meta.N_starts,0)} (простая): такие старты почти не предсказать.`;
+ // 3 cluster
+ const cb=d=>({cats:d.cluster.map(c=>c.label),series:[{name:"строго",color:"var(--c1)",vals:d.cluster.map(c=>c.fn_k0)},{name:"±5 нт",color:"var(--c3)",vals:d.cluster.map(c=>c.fn_k5)}],ylabel:"доля пропущенных стартов",tipf:(i,j)=>`соседей в ±50: ${d.cluster[i].label}<br>доля всех стартов: ${fmt(d.cluster[i].share,0)}<br>пропущено: <b>${fmt(j?d.cluster[i].fn_k5:d.cluster[i].fn_k0,1)}</b>`});
+ bars("ch_cl_v2",cb(V));bars("ch_cl_nem",cb(Nn));
+ $("t_cl").textContent=`Одиночные старты: ${fmt(V.cluster[0].share,0)} стартов v2 (пропущено ${fmt(V.cluster[0].fn_k0,0)}) и ${fmt(Nn.cluster[0].share,0)} стартов простой модели (пропущено ${fmt(Nn.cluster[0].fn_k0,0)}); в кластерах 11+ пропущено ${fmt(V.cluster[3].fn_k0,0)} и ${fmt(Nn.cluster[3].fn_k0,0)}.`;
+ // 4 PR
+ const pr=[{name:"v2",color:"var(--c1)",x:V.pr.recall,y:V.pr.precision},{name:"простая",color:"var(--c2)",x:Nn.pr.recall,y:Nn.pr.precision}];
+ legend("lg_pr",[["v2 (AUPRC "+V.pr.auprc.toFixed(3)+")","var(--c1)"],["простая (AUPRC "+Nn.pr.auprc.toFixed(3)+")","var(--c2)"]]);
+ lines("ch_pr",{series:pr,xlabel:"recall",ylabel:"precision (лог-шкала)",xmin:0,xmax:1,ymin:0.0003,ymax:1,log:true,xf:v=>v.toFixed(2),yf:v=>v.toFixed(3),yt:[0.001,0.01,0.1,1],hlines:[{y:V.pr.baseline,color:"var(--c1)",label:"случайно v2"},{y:Nn.pr.baseline,color:"var(--c2)",label:"случайно простая",dy:14}]});
+ $("t_pr").textContent=`Строгий AUPRC по позициям: v2 ${V.pr.auprc.toFixed(3)} (случайно ${V.pr.baseline.toExponential(1)}), простая ${Nn.pr.auprc.toFixed(3)} (случайно ${Nn.pr.baseline.toExponential(1)}).`;
+ // 5 pred
+ boxes("ch_box_v2",V.pred_by_gt);boxes("ch_box_nem",Nn.pred_by_gt);heat("ch_hm_v2",V.hist2d);heat("ch_hm_nem",Nn.hist2d);
+ const md=d=>d.pred_by_gt.map(r=>r.q[2]);
+ $("t_pred").textContent=`Медианный перцентиль предсказания: v2 — фон ${fmt(md(V)[0],0)}, счёт 1 ${fmt(md(V)[1],0)}, счёт 50+ ${fmt(md(V)[6],0)}; простая — фон ${fmt(md(Nn)[0],0)}, счёт 1 ${fmt(md(Nn)[1],0)}, счёт 50+ ${fmt(md(Nn)[6],0)}. Предсказание растёт со счётом, и даже слабые старты лежат в верхнем ~1% позиций; верхние N — лишь ${fmt(V.meta.N_starts/V.meta.N_scored,3)} (v2) и ${fmt(Nn.meta.N_starts/Nn.meta.N_scored,3)} (простая) позиций, поэтому строгий критерий находит малую часть: проблема в точности ранга внутри верхнего 1%.`;
+ // 6 features
+ let cf="gc";const tb=$("tb_feat");
+ function drawFeat(){histPlot("ch_ft_v2",V.features[cf],GR);histPlot("ch_ft_nem",Nn.features[cf],GR);
+  const rows=[["v2",V],["простая",Nn]].map(([n,d])=>{const q=d.features[cf];return `<tr><td>${n}</td>`+GR.map(g=>`<td class="n">${q.median[g].toFixed(3)}</td>`).join("")+["FN_vs_TP","FP_vs_BG","FP_vs_TP"].map(k=>`<td class="n">AUC ${q[k].auc.toFixed(2)}, p=${q[k].p<1e-4?"<1e-4":q[k].p.toFixed(3)}</td>`).join("")+"</tr>"}).join("");
+  $("tb_feat_tbl").innerHTML=`<div class="tw"><table><tr><th>модель</th><th class="n">медиана TP</th><th class="n">FN</th><th class="n">FP</th><th class="n">фон</th><th class="n">FN vs TP</th><th class="n">FP vs фон</th><th class="n">FP vs TP</th></tr>`+rows.replace(/<tr><td>/g,"<tr><td>")+"</table></div>";
+  // fix column order: medians in GR order TP FN FP BG
+ }
+ tb.innerHTML="";Object.entries(FN).forEach(([k,n])=>{const b=document.createElement("button");b.textContent=n;b.setAttribute("aria-pressed",k===cf);b.onclick=()=>{cf=k;[...tb.children].forEach(x=>x.setAttribute("aria-pressed",x===b));drawFeat()};tb.appendChild(b)});
+ legend("lg_feat",GR.map(g=>[NAMES[g],COL[g]]));drawFeat();
+ const gcV=V.features.gc,gcN=Nn.features.gc,cpV=V.features.cpg_oe,cpN=Nn.features.cpg_oe;
+ $("t_feat").textContent=`GC: FN vs TP AUC ${gcV["FN_vs_TP"].auc.toFixed(2)} (v2, p=${gcV["FN_vs_TP"].p.toFixed(2)}) и ${gcN["FN_vs_TP"].auc.toFixed(2)} (простая); FP vs фон AUC ${gcV["FP_vs_BG"].auc.toFixed(2)} и ${gcN["FP_vs_BG"].auc.toFixed(2)}. CpG o/e: FP vs фон AUC ${cpV["FP_vs_BG"].auc.toFixed(2)} и ${cpN["FP_vs_BG"].auc.toFixed(2)}. Пропущенные старты композицией плохо отличаются от найденных; ложные срабатывания отличаются от фона сильнее.`;
+ // 7 nucleotides
+ function nucPlot(host,d,g){const W=250,H=170,m={l:30,r:6,t:8,b:26},s=frame(host,W,H,m),xs=scale(-10,10,m.l,W-m.r),ys=scale(0,.6,H-m.b,m.t);
+  axes(s,W,H,m,xs,ys,[-10,-5,0,5,10],[0,.2,.4,.6],null,null,v=>v,v=>(v*100)+"%");
+  "ACGT".split("").forEach((b,bi)=>{const y=d.nuc[g].map(r=>r[bi]);el("path",{d:y.map((v,i)=>(i?"L":"M")+xs(i-10)+" "+ys(v)).join(""),fill:"none",stroke:COL[b],"stroke-width":1.8},s)});
+  const ov=el("rect",{x:m.l,y:m.t,width:W-m.l-m.r,height:H-m.t-m.b,fill:"transparent"},s);
+  ov.addEventListener("pointermove",ev=>{const r=s.getBoundingClientRect(),px=(ev.clientX-r.left)/r.width*W,i=Math.min(20,Math.max(0,Math.round((px-m.l)/(W-m.l-m.r)*20)));
+   showTip(ev,`${NAMES[g]}, позиция ${i-10}<br>`+"ACGT".split("").map((b,bi)=>`<span class="sw" style="background:${COL[b]}"></span>${b}: <b>${fmt(d.nuc[g][i][bi],0)}</b>`).join(" ")+"")});ov.addEventListener("pointerleave",hideTip)}
+ let nm="v2";const tn=$("tb_nuc");
+ function drawNuc(){const d=nm==="v2"?V:Nn;$("ch_nuc").innerHTML=GR.map(g=>`<div class="card"><h3>${NAMES[g]} <span class="src">n=${num(d.nuc_n[g])}</span></h3><div id="nu_${g}"></div></div>`).join("");GR.forEach(g=>nucPlot("nu_"+g,d,g));
+  const top=[...new Set(GR.flatMap(g=>Object.entries(d.dinuc[g]).sort((a,b)=>b[1]-a[1]).slice(0,5).map(x=>x[0])))].filter(x=>!x.includes("N")).slice(0,8);
+  legend("lg_di",GR.map(g=>[NAMES[g],COL[g]]));bars("ch_di",{cats:top,series:GR.map(g=>({name:NAMES[g],color:COL[g],vals:top.map(k=>d.dinuc[g][k]||0)})),W:760,max:Math.max(...top.flatMap(k=>GR.map(g=>d.dinuc[g][k]||0)))*1.1,ylabel:"доля группы",yf:v=>fmt(v,0)});}
+ tn.innerHTML="";[["v2","v2, клоп"],["nem","Простая, Nematostella"]].forEach(([k,n])=>{const b=document.createElement("button");b.textContent=n;b.setAttribute("aria-pressed",k===nm);b.onclick=()=>{nm=k;[...tn.children].forEach(x=>x.setAttribute("aria-pressed",x===b));drawNuc()};tn.appendChild(b)});
+ legend("lg_nuc",[["A","var(--c1)"],["C","var(--c2)"],["G","var(--c3)"],["T","var(--c4)"]]);drawNuc();
+ const dd=(d,g,k)=>fmt(d.dinuc[g][k]||0,0);
+ $("t_nuc").textContent=`Пара CA в позиции старта: TP ${dd(V,"TP","CA")} / FP ${dd(V,"FP","CA")} / фон ${dd(V,"BG","CA")} у v2; TP ${dd(Nn,"TP","CA")} / FP ${dd(Nn,"FP","CA")} / фон ${dd(Nn,"BG","CA")} у простой модели. Вероятно, Inr-подобный мотив (пиримидин–A): гипотеза, требует проверки по логотипу.`;
+ // findings
+ $("findings").innerHTML=[
+  `Слабые старты: при счёте 1 пропущено ${fmt(f(V),0)} (v2) и ${fmt(f(Nn),0)} (простая); при счёте 50+ — ${fmt(l(V),0)} и ${fmt(l(Nn),0)} (график 2).`,
+  `Одиночные старты (нет соседей в ±50 нт) пропускаются чаще кластерных: ${fmt(V.cluster[0].fn_k0,0)} против ${fmt(V.cluster[3].fn_k0,0)} у v2 (график 3).`,
+  `Допуск ±5 нт возвращает ${fmt(t5.recall-t0.recall,0)} стартов у v2 и ${fmt(n5.recall-n0.recall,0)} у простой модели (график 1): часть пропусков — сдвиг, остальное — старты, которые модель не видит.`,
+  `GC-состав пропуски не объясняет (AUC FN vs TP ${gcV["FN_vs_TP"].auc.toFixed(2)} и ${gcN["FN_vs_TP"].auc.toFixed(2)}); ложные срабатывания находятся в более GC/CpG-богатых местах, чем фон (график 6).`,
+  `Ложные срабатывания несут пару CA в позиции старта (график 7), возможно Inr-подобный мотив (гипотеза).`].map(t=>`<li>${t}</li>`).join("");
+ $("fixes").innerHTML=[
+  "Слабые и одиночные старты: учитывать счёт и плотность стартов в обучении (взвешивание, отдельная голова для «слабых» стартов), оценивать по пикам, а не по позициям.",
+  "Допуск по позиции: при калибровке вывода сглаживать предсказание по ±2–5 нт (или предсказывать пик, потом позицию внутри пика).",
+  "Ложные срабатывания: добавить в простую модель признаки «плотность CpG ±100» и «режим промотора» (шаг 7) и штраф за GC/CpG-богатые окна без сигнала.",
+  "Проверить гипотезу «пропуски = биологический шум»: сравнить с воспроизводимостью реплик r1/r2 (потолок качества)."].map(t=>`<li>${t}</li>`).join("");
+}
+render();
+</script>
