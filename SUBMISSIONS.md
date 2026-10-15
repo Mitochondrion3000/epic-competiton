@@ -5,6 +5,31 @@
 
 ---
 
+## 2026-10-15 · sSquSuc5.hap2 (акула) · смесь v2 ft2 + v3, alpha 0.55
+
+**Файл:** `sSquSuc5.hap2.predictions.txt.gz` (216.6 МБ). Kaggle `k13polinaa/epic-blend-shark` → Output (на CPU по готовым предсказаниям). Запасные: `…alpha0.70.txt.gz`, `…alpha0.80.txt.gz` там же. В датасет `epic-predictions` не загружен.
+Ветка `main`, коммит см. `git log`; ядро собрано из `epic_v3_bpnet.ipynb` в режиме `EPIC_REUSE_V3=1`.
+
+**Модель:** смесь `z`, вес v3 = 0.3 (подбор на tune: AUPRC 0.1001 при 0.3, максимум 0.1011 при 0.4; выбран по сумме относительных AUPRC и Spearman); v2 ft2 (`k13polinaa/epic-v2-ft2-dogfish`, 2 сида, дообучена на акуле),
+v3 (BPNet, `k13polinaa/epic-v3-shark-pred`, 1 сид v3b2, головы акулы). alpha 0.55 по tune.
+
+**Оценка на report (честные контиги):**
+
+| | AUPRC | Spearman |
+|---|---|---|
+| v2 ft2 | 0.102 | 0.337 |
+| v3 | 0.057 | 0.246 |
+| **смесь, alpha 0.55** | **0.110** | **0.337** |
+| смесь, alpha 0.70 | 0.108 | 0.343 |
+
+**Проверки файла:** строк = позиций шаблона (344 993 974); значения в [0, 1]; N-позиции = 0; 3222 уровня.
+**Лидерборд:** заполнить после отправки (сейчас у акулы 0.103 / 0.491).
+**Теги:** `CNN`, `Ensemble`, `Finetune`, `Raw` + свои `multi-species`, `BPNet`.
+
+**Текст для формы сабмита (EN):**
+> Ensemble of two models: v2 (multi-scale CNN with attention, fine-tuned on the training data of sSquSuc5.hap2 from a model pretrained on other EPIC species, 2 seeds) and v3 (BPNet/ProCapNet trained on EPIC training data, 1 seed), averaged as z-scores with weight 0.3 for v3. Rank-power alpha = 0.55.
+
+
 ## 2026-10-10 · ASM119413v2 (осьминог) · v3 на своих данных + устрица, alpha 0.5
 
 **Файл:** `ASM119413v2.predictions.txt.gz` (в датасете `ivanmitochondrion/epic-predictions`: `submissions/ASM119413v2.predictions.v3.alpha0.50.txt.gz.bin`).
