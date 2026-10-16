@@ -1,0 +1,15 @@
+{
+ "id": "ivanmitochondrion/epic-motifs-bug",
+ "title": "epic-motifs-bug",
+ "code_file": "run.py",
+ "language": "python",
+ "kernel_type": "script",
+ "is_private": "true",
+ "enable_gpu": "false",
+ "enable_internet": "true",
+ "dataset_sources": [
+  "ivanmitochondrion/epic-v2-moth-ckpt"
+ ],
+ "competition_sources": [],
+ "kernel_sources": []
+}
