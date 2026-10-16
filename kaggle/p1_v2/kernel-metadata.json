@@ -1,0 +1,16 @@
+{
+ "id": "ivanmitochondrion/epic-p1-v2",
+ "title": "epic-p1-v2",
+ "code_file": "p1_v2.ipynb",
+ "language": "python",
+ "kernel_type": "notebook",
+ "is_private": true,
+ "enable_gpu": false,
+ "enable_tpu": false,
+ "enable_internet": true,
+ "dataset_sources": [],
+ "competition_sources": [],
+ "kernel_sources": [
+  "ivanmitochondrion/epic-v2-ofas-moth"
+ ]
+}

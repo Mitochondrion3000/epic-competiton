@@ -73,3 +73,35 @@ def seq_codes(chrom, start, end, strand, genome, total):
         b, p_ = (COMP[ext[1:n + 1]], COMP[ext[2:n + 2]]) if st else (ext[1:n + 1], ext[0:n])
         base[o:o + n] = b % 4 if False else np.where(b < 8, b % 4, 4); prev[o:o + n] = np.where(p_ < 8, p_ % 4, 4); o += n
     return base, prev
+
+
+def local_norm(z, beta, R, seg=None):
+    """P-1: score - beta * (локальное среднее score в ±R). seg=(off, len) — среднее считается внутри каждой строки (контиг/цепь), не через границы."""
+    if seg is None: return (z - beta * uniform_filter1d(z, 2 * R + 1, mode="nearest")).astype(np.float32)
+    out = np.empty_like(z, dtype=np.float32)
+    for o, l in zip(*seg): out[o:o + l] = z[o:o + l] - beta * uniform_filter1d(z[o:o + l], 2 * R + 1, mode="nearest")
+    return out
+
+def run_p1(z, gt, ok, fold, out, seg=None, Rs=(2000, 5000, 10000, 20000), betas=(0.25, 0.5, 0.75, 1.0), alphas=ALPHAS, max_sp_loss=0.01):
+    """P-1: делительная/вычитающая локальная нормировка. Параметры (R, beta, alpha) выбираются на одной половине (макс. AUPRC при потере
+    Spearman <= max_sp_loss против лучшего baseline этой половины), оценка на другой; обе стороны. Критерий приёмки: AUPRC +3% при потере Spearman < 0.01."""
+    import pandas as pd
+    z = z.astype(np.float32); idx = {f: np.flatnonzero((fold == f) & ok) for f in (0, 1)}; rows = []
+    def measure(R, beta, s):
+        for a in alphas:
+            for f in (0, 1):
+                m = official_score(rank_power(s[idx[f]], a), gt[idx[f]]); rows.append(dict(R=R, beta=beta, alpha=a, fold=f, **m))
+    measure(0, 0.0, z)
+    for R, b in itertools.product(Rs, betas): measure(R, b, local_norm(z, b, R, seg)); print("R", R, "beta", b, flush=True)
+    df = pd.DataFrame(rows); df.to_csv(out + ".grid.csv", index=False); res = []
+    for ev in (0, 1):
+        tr = 1 - ev; g = df[df.fold == tr]; bt = g[g.R == 0].sort_values("AUPRC", ascending=False).iloc[0]
+        cand = g[(g.R > 0) & (g.Spearman >= bt.Spearman - max_sp_loss)]
+        pick = (cand if len(cand) else g[g.R > 0]).sort_values("AUPRC", ascending=False).iloc[0]
+        be = df[(df.fold == ev) & (df.R == 0) & (df.alpha == bt.alpha)].iloc[0]
+        pe = df[(df.fold == ev) & (df.R == pick.R) & (df.beta == pick.beta) & (df.alpha == pick.alpha)].iloc[0]
+        res.append(dict(eval_fold=ev, R=pick.R, beta=pick.beta, alpha=pick.alpha, base_alpha=bt.alpha, AUPRC_base=be.AUPRC, AUPRC=pe.AUPRC,
+                        Spearman_base=be.Spearman, Spearman=pe.Spearman, dAUPRC_pct=(pe.AUPRC / be.AUPRC - 1) * 100, dSpearman=pe.Spearman - be.Spearman))
+    R_ = pd.DataFrame(res); R_.to_csv(out + ".summary.csv", index=False); print(R_.round(4).to_string())
+    print("СРЕДНЕЕ dAUPRC_pct = %.2f, dSpearman = %.4f" % (R_.dAUPRC_pct.mean(), R_.dSpearman.mean()))
+    return R_

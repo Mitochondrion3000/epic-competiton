@@ -1,0 +1,54 @@
+# Собирает kaggle/alphagenome_nem/run.py: метрики EPIC + tools/alphagenome_validate.py + драйвер на Nematostella. Запуск: python kaggle/alphagenome_nem/make.py
+# Ядро (CPU, интернет) требует секрет Kaggle ALPHAGENOME_API_KEY (Add-ons -> Secrets), ключ: https://alphagenome.google/api. Бюджет окон: BUDGET (по умолчанию 40 = ~40 Мнт).
+import json, os
+root = os.path.dirname(os.path.abspath(__file__)); repo = os.path.dirname(os.path.dirname(root))
+sc = open(f"{repo}/kaggle/strand_check/run.py", encoding="utf-8").read(); head = sc[:sc.index("import os, glob, json")]
+ag = open(f"{repo}/tools/alphagenome_validate.py", encoding="utf-8").read()
+ag = ag[ag.index('import os\nimport numpy as np'):]                # без докстринга (он уже описан выше)
+rank_power_pad = "\n"
+driver = '''
+import glob, gzip, tarfile, requests, pandas as pd
+BUDGET = int(os.environ.get("AG_BUDGET", "40")); SP = "jaNemVect1.1"; D = "/tmp/epic"; B = f"{D}/{SP}"; OUT = "/kaggle/working"
+os.system("pip install -q alphagenome")
+if not os.path.isdir(B):
+    os.makedirs(D, exist_ok=True)
+    rec = requests.get("https://zenodo.org/api/records/22285753", timeout=60).json()
+    f = [x for x in rec["files"] if x["key"] == f"{SP}.tgz"][0]; dst = f"{D}/{SP}.tgz"
+    with requests.get(f["links"]["self"], stream=True, timeout=120) as r, open(dst, "wb") as fh:
+        for ch in r.iter_content(1 << 22): fh.write(ch)
+    with tarfile.open(dst) as tf: tf.extractall(D)
+    os.remove(dst)
+rd = lambda p, dt: pd.read_csv(p, header=None, dtype=dt)[0].values
+gt = rd(f"{B}/ground_truth/csRNA-test.txt.gz", np.float32)
+m1 = rd(f"{B}/scoring/mask1-test.txt.gz", np.int8).astype(bool); m2 = rd(f"{B}/scoring/mask2-test.txt.gz", np.int8).astype(bool)
+tpl = pd.read_csv(f"{B}/for_participants/template.test.bed.gz", sep="\\t", header=None, usecols=range(6), names=["chrom","start","end","name","score","strand"], dtype={"chrom": str, "strand": str})
+ln = (tpl.end - tpl.start).values; off = np.r_[0, np.cumsum(ln)[:-1]]; assert ln.sum() == len(gt)
+ok = m1 | m2
+rows_ok = np.array([ok[o:o + l].any() for o, l in zip(off, ln)])
+LUT = np.full(256, 8, np.uint8)
+for i, b in enumerate("ACGT"): LUT[ord(b)] = i; LUT[ord(b.lower())] = i + 4
+genome, name, ch = {}, None, []; keep = set(tpl.chrom)
+def flush():
+    if name in keep: genome[name] = LUT[np.frombuffer(b"".join(ch), np.uint8)]
+with gzip.open(f"{B}/genome/genome.fa.gz", "rb") as fh:
+    for l in fh:
+        if l.startswith(b">"): flush(); name = l[1:].split()[0].decode(); ch = []
+        elif name in keep: ch.append(l.rstrip())
+flush()
+wins = select_windows(tpl, rows_ok, BUDGET); print("окон:", len(wins), "~Мнт:", len(wins) * W / 1e6, flush=True)
+client = make_client(); cache = {}
+for i in range(0, len(wins), 5):                             # по 5 окон, чтобы не терять прогресс при сбое
+    predict_windows(client, genome, wins[i:i + 5], cache); print("готово окон", len(cache), flush=True)
+rows = []
+for t in TYPES:
+    for how in ("mean", "max"):
+        s = build_scores(tpl, cache, (t, how))
+        for r in evaluate(s, gt, ok, official_score, rank_power): rows.append(dict(type=t, agg=how, **r))
+tab = pd.DataFrame(rows); tab.to_csv(f"{OUT}/ag_nem_metrics.csv", index=False); print(tab.round(5).to_string())
+print("СИГНАЛ ЕСТЬ (AUPRC >= 0.01)" if (tab.AUPRC >= 0.01).any() else "СИГНАЛА НЕТ: AUPRC < 0.01 во всех вариантах")
+'''
+open(f"{root}/run.py", "w", encoding="utf-8").write(head + "\nimport numpy as np\n" + ag + driver)
+json.dump({"id": "ivanmitochondrion/epic-alphagenome-nem", "title": "epic-alphagenome-nem", "code_file": "run.py", "language": "python", "kernel_type": "script",
+           "is_private": True, "enable_gpu": False, "enable_tpu": False, "enable_internet": True, "dataset_sources": [], "competition_sources": [], "kernel_sources": []},
+          open(f"{root}/kernel-metadata.json", "w"), indent=1)
+print("готово")
