@@ -111,6 +111,9 @@ CFG = dict(
     KEEP_MODEL_FRAC=0.8,
     EXTRA_SUB_ALPHAS=(0.7, 0.8),  # дополнительно записать сабмиты с этими alpha (Spearman растёт с alpha, AUPRC немного падает)      # в ансамбль идут модели с AUPRC на tune >= этой доли от лучшей
     ALPHAS=(0.0, 0.3, 0.4, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.9), KEEP_FRAC=0.995,
+    SELECT="lb",              # выбор смеси и alpha: "lb" — минимум произведения мест на текущем лидерборде вида (оценка по tune), "keep" — старое правило
+    LB_TEAM="Mitochondrion", LB_SHORTLIST=6,
+    LB_CALIB=(1.0, 1.0),      # множители tune -> лидерборд для (AUPRC, Spearman), если hold-out вида систематически легче/тяжелее теста   # своя команда (не считается соперником); сколько смесей из сетки проверять по alpha
     BLEND_WEIGHTS=tuple(np.round(np.arange(0, 1.01, 0.1), 2)),   # вес v3 в смеси с v2
 )
 if FAST_DEV:
@@ -886,6 +889,42 @@ def normalise(x, nmask, how):
 def blend(a, b, w, how, nmask):
     return w * normalise(a, nmask, how) + (1 - w) * normalise(b, nmask, how)
 
+# --- правило выбора по лидерборду: место вида = порядок по ПРОИЗВЕДЕНИЮ мест по AUPRC и Spearman среди всех сабмитов
+#     (проверено 2026-10-16 по API: порядок команд совпадает с rank0_AUPRC * rank0_Spearman). Метрики кандидата берём с tune
+#     (квантование с рангами под размер теста), считаем его места среди чужих сабмитов и берём минимум произведения.
+def lb_submissions(species):
+    import urllib.request
+    try:
+        sp = json.load(urllib.request.urlopen("https://epic.autosome.org/api/v1/species", timeout=30))
+        ids = [x.get("id") or x.get("assembly") for x in (sp if isinstance(sp, list) else sp.get("species", sp.get("items", [])))]
+        sid = next((i for i in ids if i and (i == species or i.startswith(species + "-"))), species)
+        d = json.load(urllib.request.urlopen(f"https://epic.autosome.org/api/v1/leaderboard/species/{sid}?limit=500&show=all", timeout=60))
+        out = []
+        for t in d["teams"]:
+            m = {x["metric"]: x["score"] for x in t["metrics"]}; out.append((t["teamName"], m.get("prauc"), m.get("spearman")))
+        out = [(t, a, r) for t, a, r in out if a is not None and r is not None and t != CFG["LB_TEAM"]]
+        print(f"лидерборд {sid}: {len(out)} чужих сабмитов"); return out
+    except Exception as e:
+        print("лидерборд недоступен:", repr(e)[:200]); return None
+
+def lb_rank(auprc, spear, subs):
+    auprc, spear = auprc * CFG["LB_CALIB"][0], spear * CFG["LB_CALIB"][1]
+    A = np.array([a for _, a, _ in subs]); S = np.array([r for _, _, r in subs])
+    ra, rs = 1 + int((A > auprc).sum()), 1 + int((S > spear).sum())
+    return ra, rs, ra * rs
+
+def alpha_grid_ranked(score, gt, nmask, alphas):
+    # сетка alpha с одной сортировкой: ранги считаются один раз, затем r^-alpha для каждого alpha (как rank_power с n_ref)
+    sel = ~nmask; x = np.asarray(score, np.float64)[sel]; n = len(x)
+    order = np.argsort(-x, kind="stable"); r = np.empty(n, np.float64); r[order] = np.arange(1, n + 1, dtype=np.float64); del order
+    g = gt[sel]; rows_ = []
+    for a in alphas:
+        v = (1 - (r - 1) / n) if a == 0 else np.power(r * (N_REF / n), -a)
+        rows_.append({"alpha": a, **official_score(np.rint(np.clip(v, 0, 1) * SCALE) / SCALE, g)})
+    return pd.DataFrame(rows_)
+
+LB_SUBS = lb_submissions(TARGET) if CFG.get("SELECT") == "lb" else None
+
 V2_DIR = find_v2(); BLEND = None
 # EPIC_BLEND="z:0.4" (способ:вес v3) и EPIC_ALPHA="0.7" — задать смесь вручную, когда tune нечестен для v2 (v2 училась на всех контигах вида)
 FORCE_BLEND = os.environ.get("EPIC_BLEND", "")
@@ -904,6 +943,21 @@ if V2_DIR:
         bg["score"] = bg.AUPRC / bg.AUPRC.max() + bg.Spearman / bg.Spearman.max()
         best = bg.loc[bg.score.idxmax()]; BLEND = dict(how=best.how, w=float(best.w_v3))
         show(bg.round(5), "blend_grid_tune")
+        LB_PICK = None
+        if LB_SUBS and not FORCE_BLEND:
+            # кандидаты: лучшие по сырой сетке смеси + v2 и v3 по отдельности; для каждого сетка alpha; минимум произведения мест
+            short = bg.nlargest(CFG["LB_SHORTLIST"], "score")[["how", "w_v3"]].values.tolist() + [["z", 0.0], ["z", 1.0]]
+            lr = []
+            for how, w in {(h, float(w)) for h, w in short}:
+                g = alpha_grid_ranked(blend(HO["tune"]["v3"], V2["tune"], w, how, tn["n"]), tn["gt"], tn["n"], CFG["ALPHAS"])
+                for _, row in g.iterrows():
+                    ra, rs, pr = lb_rank(row.AUPRC, row.Spearman, LB_SUBS)
+                    lr.append({"how": how, "w_v3": w, "alpha": row.alpha, "AUPRC": row.AUPRC, "Spearman": row.Spearman, "место AUPRC": ra, "место Spearman": rs, "произведение": pr})
+            lr = pd.DataFrame(lr).sort_values(["произведение", "Spearman"], ascending=[True, False])
+            show(lr.head(15).round(5), "lb_select_tune")
+            LB_PICK = lr.iloc[0]; BLEND = dict(how=LB_PICK.how, w=float(LB_PICK.w_v3))
+            print(f"ИТОГ выбор по лидерборду: {BLEND}, alpha {LB_PICK.alpha}, tune {LB_PICK.AUPRC:.4f}/{LB_PICK.Spearman:.4f}, "
+                  f"места {LB_PICK['место AUPRC']}x{LB_PICK['место Spearman']}")
         if FORCE_BLEND:   # v2 видела tune этого вида: сетка на tune смещена в пользу v2, вес и alpha задаём заранее
             BLEND = dict(how=FORCE_BLEND.split(":")[0], w=float(FORCE_BLEND.split(":")[1]))
             print("смесь задана вручную (EPIC_BLEND):", BLEND, "| по tune была бы:", dict(how=best.how, w=float(best.w_v3)))
@@ -911,6 +965,7 @@ if V2_DIR:
             print("выбрана смесь:", BLEND)
         tune_bl = blend(HO["tune"]["v3"], V2["tune"], BLEND["w"], BLEND["how"], tn["n"])
         ALPHA, grid_bl = choose_alpha(tune_bl, tn["gt"], tn["n"])
+        if LB_PICK is not None: ALPHA = float(LB_PICK.alpha)
         if FORCE_ALPHA is not None: ALPHA = FORCE_ALPHA
         show(grid_bl.round(5), "blend_alpha_grid_tune")
         ALPHA_V2, _ = choose_alpha(V2["tune"], tn["gt"], tn["n"])
