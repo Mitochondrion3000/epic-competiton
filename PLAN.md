@@ -9,7 +9,7 @@
 * Явные мотивы уже проверены: +0.002 AUPRC в смеси. RC-симметрия встроена. Дешёвая постобработка ≤3% AUPRC с потерей Spearman. Голова силы поверх готового скора не помогла (дообучение внутри v2 ещё не проверено).
 * Потолок по репликам клопа: 0.32 / 0.92. Запас по Spearman больше, чем по AUPRC, но места считаются по произведению, поэтому нужны оба.
 * GPU-квота `ivanmitochondrion` и `k13polinaa` исчерпана до недельного сброса. CPU-ядра бесплатны. Evo2/AlphaGenome недоступны на T4/P100.
-* Правила: вход только геном (плюс AlphaGenome/Evo2); sRNA-seq и реплики только как вспомогательные цели на train.
+* Правила (EPIC_final.pdf, п. 2.6, дословно): «Only the genome sequences and the EPIC-provided transcription initiation tracks may be used. Existing annotations, orthology relationships, expression data, other experimental tracks, or any other external data are not permitted. The exception is pretrained genomic models, such as (but not limited to) AlphaGenome or Evo 2 published prior to the challenge start date.» Значит: геном + треки инициации от организаторов (csRNA-seq). **Риск:** базы мотивов JASPAR/HOCOMOCO/TRANSFAC и внешние аннотации под запрет «any other external data» подпадают; использовать их в сабмитных моделях нельзя без подтверждения организаторов. sRNA-seq: «other experimental track», тоже под вопросом. Дедлайн: 2026-12-31.
 
 ## Правило CPU-first (Иван, 2026-10-16)
 
