@@ -1,9 +1,9 @@
 # Собирает ядро Kaggle из epic_v2_model.ipynb: первая ячейка после заголовка задаёт вид, FAST_DEV и переопределения CFG через окружение.
-# python kaggle/v2_ab/make.py <slug> <species> '<json CFG>' [datasets] [--cpu] [--fast] [--holdout-only] [--prep-only] [--kernels=a,b] [--account=ivanmitochondrion]
+# python kaggle/v2_ab/make.py <slug> <species> '<json CFG>' [datasets] [--cpu] [--fast] [--holdout-only] [--prep-only] [--train-only] [--kernels=a,b] [--account=ivanmitochondrion]
 import json, os, sys
 slug, species, cfg = sys.argv[1], sys.argv[2], sys.argv[3]
 datasets = sys.argv[4].split(",") if len(sys.argv) > 4 and sys.argv[4] and not sys.argv[4].startswith("--") else []
-gpu = "--cpu" not in sys.argv; fast = "--fast" in sys.argv; holdout_only = "--holdout-only" in sys.argv; prep_only = "--prep-only" in sys.argv
+gpu = "--cpu" not in sys.argv; fast = "--fast" in sys.argv; holdout_only = "--holdout-only" in sys.argv; prep_only = "--prep-only" in sys.argv; train_only = "--train-only" in sys.argv
 kernels = next((a.split("=", 1)[1].split(",") for a in sys.argv if a.startswith("--kernels=")), [])
 account = next((a.split("=", 1)[1] for a in sys.argv if a.startswith("--account=")), "ivanmitochondrion")
 root = os.path.dirname(os.path.abspath(__file__)); repo = os.path.dirname(os.path.dirname(root))
@@ -12,6 +12,9 @@ env = (f'import os\nos.environ["EPIC_SPECIES"] = {species!r}\nos.environ["EPIC_C
        + ('os.environ["EPIC_FAST_DEV"] = "1"\n' if fast else '') + 'print("EPIC_CFG_JSON =", os.environ["EPIC_CFG_JSON"])')
 if holdout_only:
     k = next(i for i, c in enumerate(nb["cells"]) if "".join(c["source"]).startswith("# 7.2 "))
+    nb["cells"] = nb["cells"][:k + 1]
+if train_only:      # только обучение (до ячейки 6.4 включительно), без предсказаний: для замера скорости
+    k = next(i for i, c in enumerate(nb["cells"]) if "".join(c["source"]).startswith("# 6.4 "))
     nb["cells"] = nb["cells"][:k + 1]
 if prep_only:       # разбор данных + запись кэша (CFG PREP_CACHE=1) + замер скорости CPU-сэмплера, без обучения: бесплатное CPU-ядро
     k = next(i for i, c in enumerate(nb["cells"]) if "".join(c["source"]).startswith("# 4.1 "))
