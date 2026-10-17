@@ -150,6 +150,7 @@ def evaluate(scores, gt, ok, official_score, rank_power, alphas=(0.6, 0.75)):
 import glob, gzip, tarfile, requests, pandas as pd
 BUDGET = int(os.environ.get("AG_BUDGET", "40")); SP = "jaNemVect1.1"; D = "/tmp/epic"; B = f"{D}/{SP}"; OUT = "/kaggle/working"
 os.system("pip install -q alphagenome")
+client = make_client(); print("ключ найден, клиент создан", flush=True)   # раньше загрузки данных: без секрета падаем сразу
 if not os.path.isdir(B):
     os.makedirs(D, exist_ok=True)
     rec = requests.get("https://zenodo.org/api/records/22285753", timeout=60).json()
@@ -176,7 +177,7 @@ with gzip.open(f"{B}/genome/genome.fa.gz", "rb") as fh:
         elif name in keep: ch.append(l.rstrip())
 flush()
 wins = select_windows(tpl, rows_ok, BUDGET); print("окон:", len(wins), "~Мнт:", len(wins) * W / 1e6, flush=True)
-client = make_client(); cache = {}
+cache = {}
 for i in range(0, len(wins), 5):                             # по 5 окон, чтобы не терять прогресс при сбое
     predict_windows(client, genome, wins[i:i + 5], cache); print("готово окон", len(cache), flush=True)
 rows = []
