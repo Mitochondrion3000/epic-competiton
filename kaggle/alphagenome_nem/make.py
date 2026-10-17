@@ -46,10 +46,36 @@ for t in TYPES:
         s = build_scores(tpl, cache, (t, how))
         for r in evaluate(s, gt, ok, official_score, rank_power): rows.append(dict(type=t, agg=how, **r))
 tab = pd.DataFrame(rows); tab.to_csv(f"{OUT}/ag_nem_metrics.csv", index=False); print(tab.round(5).to_string())
+
+# --- шаг 4 D-1: признак AlphaGenome поверх скора v2 (CPU-реранкер: z_v2 + w * z_ag), w и alpha на одной половине теста, оценка на другой
+cand = glob.glob("/kaggle/input/**/test_lograte.npy", recursive=True); print(cand)
+p2 = np.load([c for c in cand if SP in c][0] if any(SP in c for c in cand) else cand[0]).astype(np.float32).ravel(); assert len(p2) == len(gt)
+S = {(t, how): build_scores(tpl, cache, (t, how)) for t in TYPES for how in ("mean",)}
+np.savez_compressed(f"{OUT}/ag_nem_scores.npz", **{f"{t}_{h}": np.nan_to_num(v, nan=-1).astype(np.float16) for (t, h), v in S.items()})
+cov = ok & np.isfinite(p2) & np.isfinite(S[("CAGE", "mean")]) & np.isfinite(S[("PROCAP", "mean")])
+zs = lambda v: (v - v[cov].mean()) / v[cov].std()
+z2 = zs(p2); res = []
+for t in TYPES:
+    za = zs(np.log1p(np.maximum(S[(t, "mean")], 0)))
+    for W_ in (0.0, 0.1, 0.2, 0.35, 0.5, 1.0):
+        sc = z2 + W_ * za
+        for a_ in (0.6, 0.75):
+            for hn, hm in (("half1", m1), ("half2", m2)):
+                ii = np.flatnonzero(cov & hm)
+                if len(ii): res.append(dict(type=t, w=W_, alpha=a_, half=hn, **official_score(rank_power(sc[ii], a_), gt[ii])))
+R2 = pd.DataFrame(res); R2.to_csv(f"{OUT}/ag_nem_combine.csv", index=False); print(R2.round(4).to_string())
+for t in TYPES:
+    out = []
+    for ev, tr in (("half1", "half2"), ("half2", "half1")):
+        g = R2[(R2.type == t) & (R2.half == tr)]; best = g.sort_values("AUPRC", ascending=False).iloc[0]
+        e = R2[(R2.type == t) & (R2.half == ev)]
+        base = e[(e.w == 0.0) & (e.alpha == best.alpha)].iloc[0]; pick = e[(e.w == best.w) & (e.alpha == best.alpha)].iloc[0]
+        out.append(dict(type=t, eval=ev, w=best.w, alpha=best.alpha, AUPRC_v2=base.AUPRC, AUPRC_comb=pick.AUPRC, Sp_v2=base.Spearman, Sp_comb=pick.Spearman, dAUPRC_pct=(pick.AUPRC / base.AUPRC - 1) * 100))
+    print(pd.DataFrame(out).round(4).to_string())
 print("СИГНАЛ ЕСТЬ (AUPRC >= 0.01)" if (tab.AUPRC >= 0.01).any() else "СИГНАЛА НЕТ: AUPRC < 0.01 во всех вариантах")
 '''
 open(f"{root}/run.py", "w", encoding="utf-8").write(head + "\nimport numpy as np\n" + ag + driver)
 json.dump({"id": "ivanmitochondrion/epic-alphagenome-nem", "title": "epic-alphagenome-nem", "code_file": "run.py", "language": "python", "kernel_type": "script",
-           "is_private": True, "enable_gpu": False, "enable_tpu": False, "enable_internet": True, "dataset_sources": [], "competition_sources": [], "kernel_sources": []},
+           "is_private": True, "enable_gpu": False, "enable_tpu": False, "enable_internet": True, "dataset_sources": [], "competition_sources": [], "kernel_sources": ["ivanmitochondrion/epic-v2-nematostella"]},
           open(f"{root}/kernel-metadata.json", "w"), indent=1)
 print("готово")
