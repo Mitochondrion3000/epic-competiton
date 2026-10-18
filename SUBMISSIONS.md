@@ -15,15 +15,12 @@
 
 **Проверки файла:** 113 971 908 строк = позиций шаблона; значения в [0, 1]; N-позиции = 0; 1 720 уровней.
 
-**Лидерборд:** — (заполнить после отправки)
+**Лидерборд:** загружен 2026-10-18 17:17–17:19, один из двух (какой именно, уточнить у Ивана): `misty-gecko-ff20` 0.25797 / 0.55844 или `emerald-wolf-9e3d` 0.2577 / 0.56609; места 115×16=1840 и 117×8=936 (прежний сабмит 200×36=7200), место в зачёте ~9.
 
 **Теги:** `CNN`, `Ensemble`, `Raw` + свои `multi-species`, `InitiationNet`, `BPNet`.
 
-**Текст для формы сабмита (EN):**
-> Blend of sequence-only CNNs, z-scored scores combined with weights 0.5 (model A) and 0.5 (model B), rank-power quantised (alpha = 0.70).
-> Model A: InitiationNet-style multi-scale CNN with attention, 2 seeds, pretrained jointly on six species with per-species heads, then fine-tuned on ilPloInte3.2.
-> Model B: earlier blend of that kind of CNN (0.6) and a BPNet/ProCapNet-style dilated CNN (0.4), both trained on Ofas_2.0 and other species' training data.
-> No external data or pretrained third-party weights. Blend weights and alpha fixed in advance; hold-out contigs of this species were seen during training.
+**Текст для формы сабмита (EN, ≤512 знаков, 401):**
+> Blend of sequence-only CNNs (z-scored, weights 0.5/0.5, rank-power alpha 0.70). A: InitiationNet-style CNN with attention, 2 seeds, pretrained on six species with per-species heads, fine-tuned on this species. B: earlier blend of that CNN (0.6) and a BPNet/ProCapNet-style CNN (0.4). No external data or third-party pretrained weights. Weights fixed in advance; hold-out contigs were seen in training.
 
 ---
 
@@ -37,15 +34,12 @@
 
 **Проверки файла:** 113 971 908 строк = позиций шаблона; значения в [0, 1]; N-позиции = 0; 1 720 уровней.
 
-**Лидерборд:** — (заполнить после отправки)
+**Лидерборд:** (тот же результат, см. пару выше) загружен 2026-10-18 17:17–17:19, один из двух (какой именно, уточнить у Ивана): `misty-gecko-ff20` 0.25797 / 0.55844 или `emerald-wolf-9e3d` 0.2577 / 0.56609; места 115×16=1840 и 117×8=936 (прежний сабмит 200×36=7200), место в зачёте ~9.
 
 **Теги:** `CNN`, `Ensemble`, `Raw` + свои `multi-species`, `InitiationNet`, `BPNet`.
 
-**Текст для формы сабмита (EN):**
-> Blend of sequence-only CNNs, z-scored scores combined with weights 0.3 (model A) and 0.7 (model B), rank-power quantised (alpha = 0.70).
-> Model A: InitiationNet-style multi-scale CNN with attention, 2 seeds, pretrained jointly on six species with per-species heads, then fine-tuned on ilPloInte3.2.
-> Model B: earlier blend of that kind of CNN (0.6) and a BPNet/ProCapNet-style dilated CNN (0.4), both trained on Ofas_2.0 and other species' training data.
-> No external data or pretrained third-party weights. Blend weights and alpha fixed in advance; hold-out contigs of this species were seen during training.
+**Текст для формы сабмита (EN, ≤512 знаков, 401):**
+> Blend of sequence-only CNNs (z-scored, weights 0.3/0.7, rank-power alpha 0.70). A: InitiationNet-style CNN with attention, 2 seeds, pretrained on six species with per-species heads, fine-tuned on this species. B: earlier blend of that CNN (0.6) and a BPNet/ProCapNet-style CNN (0.4). No external data or third-party pretrained weights. Weights fixed in advance; hold-out contigs were seen in training.
 
 ---
 
