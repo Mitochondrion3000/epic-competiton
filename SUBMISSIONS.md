@@ -10,7 +10,7 @@
 **Файл:** `ilPloInte3.2.predictions.blend_m3ft_w0.7_old.alpha0.70.txt.gz` (32.9 МБ). Kaggle `k13polinaa/epic-moth-blend-w07` (CPU) → Output → `moth_blend/`. Скрипт как `tools/blend_moth_m3ft.py` с весом 0.7. Источники те же.
 **Почему 0.7:** на лидерборде вес m3ft 0.5 (emerald-wolf, Иван подтвердил) дал 0.2577 / 0.56609, вес 0.3 (misty-gecko) 0.25797 / 0.55844; больший вес поднимал Spearman при том же AUPRC.
 **Проверки файла:** 113 971 908 строк = позиций шаблона; значения в [0, 1]; N-позиции = 0; 1 720 уровней.
-**Лидерборд:** — (заполнить после отправки)
+**Лидерборд:** 2026-10-18 18:13, AUPRC 0.25209 / Spearman 0.56709 (вес m3ft 0.7), место сайта 25. Вес 0.5 остаётся лучшим по произведению мест.
 **Теги:** `CNN`, `Ensemble`, `Raw` + свои `multi-species`, `InitiationNet`, `BPNet`.
 **Текст для формы сабмита (EN, ≤512 знаков, 401):**
 > Blend of sequence-only CNNs (z-scored, weights 0.7/0.3, rank-power alpha 0.70). A: InitiationNet-style CNN with attention, 2 seeds, pretrained on six species with per-species heads, fine-tuned on this species. B: earlier blend of that CNN (0.6) and a BPNet/ProCapNet-style CNN (0.4). No external data or third-party pretrained weights. Weights fixed in advance; hold-out contigs were seen in training.
