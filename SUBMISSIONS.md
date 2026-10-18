@@ -5,6 +5,43 @@
 
 ---
 
+## 2026-10-18 · ilPloInte3.2 (моль) · v2 M-3 (претрейн на 6 видах + ft моли), alpha 0.65
+
+**Файл:** `ilPloInte3.2.predictions.txt.gz` (34.3 МБ). Kaggle `k13polinaa/epic-v2-m3ft-moth` (версия 1) → Output → `epic_runs/ilPloInte3.2/`.
+В датасет `epic-predictions` пока не выложен. Ветка `claude/week0-code`, коммит — см. запись в `git log` (ноутбук `epic_v2_model.ipynb`).
+
+**Модель:** v2 InitiationNet (CNN + attention), 2 сида, среднее log-rate, rank-power quantisation с alpha 0.65.
+Путь: претрейн на 6 видах (клоп + моль + устрица + акула + осьминог + Nematostella, `epic-v2-m3-pre2`, 80k шагов, ≈8,0 ч), затем ft
+на моли (голова 1, 48k шагов, LR 6e-4, `epic-v2-m3ft-moth`, ≈2,6 ч на обе карты). Сид 0 и сид 1 обучались независимо, по одному на карту.
+Предобученных внешних моделей и внешних данных нет.
+
+**Оценка на report (ранги растянуты до размера теста):**
+
+| | AUPRC | Spearman | честная? |
+|---|---|---|---|
+| сид 0 | 0.268 | 0.693 | нет: претрейн видел все контиги моли |
+| сид 1 | 0.267 | 0.612 | нет |
+| **ансамбль, alpha 0.65** | 0.307 | 0.671 | нет |
+| старая v2 (смесь 10.10) | 0.386 | 0.780 | нет |
+
+Оценка нечестная (претрейн на всех контигах моли), а у старой v2 утечка была сильнее, так что сравнивать эти числа нельзя.
+Ориентир только лидерборд: нынешняя моль 0.240 / 0.541 (id 882).
+tune (EMA, шаг 48000): AUPRC 0.244 / 0.247, Spearman 0.338 / 0.321.
+
+**Проверки файла:** 113 971 908 строк = позиций шаблона; значения в [0, 1], NaN нет; официальный валидатор не запускали.
+
+**Лидерборд:** — (заполнить после отправки)
+
+**Теги:** `CNN`, `Ensemble`, `Raw` + свои `multi-species`, `InitiationNet`. `Finetune` не ставить: дообучали собственную модель, не предобученную чужую.
+
+**Текст для формы сабмита (EN):**
+> Ensemble of two sequence-only CNNs with attention (InitiationNet-style multi-scale CNN, 2 seeds, averaged log-rates), rank-power quantised (alpha = 0.65).
+> Pretrained jointly on six species (Ofas_2.0, ilPloInte3.2, Magallana, shark, octopus, Nematostella training data) with per-species heads,
+> then fine-tuned on ilPloInte3.2 only. No external data or pretrained third-party weights.
+> Hold-out contigs of this species were seen during multi-species pretraining, so our own hold-out numbers are optimistic (AUPRC 0.307, Spearman 0.671).
+
+---
+
 ## Правила ведения и сверка с сайтом (O-2, 2026-10-16)
 
 `SUBMISSIONS.md` — **единственный источник правды по сабмитам**. `STATUS.md`, `MODELS.md`, `PLAN.md` ссылаются сюда и не дублируют. В каждую запись добавлять поля **«id сабмита на сайте»** (`submissionId` из API) и **«место на момент проверки»** (оба — по `GET https://epic.autosome.org/api/v1/leaderboard/species/<id>?limit=500&show=all`, id вида: `Ofas_2.0`, `ilPloInte3.2`, `cgigas_uk_roslin_v1-Heart`, `sSquSuc5.hap2`, `ASM119413v2-Kidney`).
