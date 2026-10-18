@@ -5,6 +5,50 @@
 
 ---
 
+## 2026-10-18 · ilPloInte3.2 (моль) · смесь m3ft (вес 0.5) + прежний сабмит, alpha 0.70
+
+**Файл:** `ilPloInte3.2.predictions.blend_m3ft_w0.5_old.alpha0.70.txt.gz`. Kaggle `k13polinaa/epic-moth-blend-m3ft` (версия 1, CPU) → Output → `moth_blend/`.
+Скрипт `tools/blend_moth_m3ft.py` (ветка `claude/week0-code`). Источники: `k13polinaa/epic-v2-m3ft-moth` (`test_lograte.npy`) и `k13polinaa/epic-v3-moth-blend` (`test_final_score.npy`, это смесь 0.6 v2 + 0.4 v3 прежнего сабмита 0.2400 / 0.5414).
+
+**Модель:** 0.5 × z(m3ft) + 0.5 × z(прежняя смесь), rank-power quantisation alpha 0.70 (как у прежнего сабмита). Корреляция Spearman между входами 0.80 (2 млн позиций).
+Вес и alpha заданы заранее, не подобраны: обе модели видели все контиги моли, честной оценки нет. Оценка только по лидерборду, база 0.23752 / 0.55 (m3ft) и 0.2400 / 0.5414.
+
+**Проверки файла:** 113 971 908 строк = позиций шаблона; значения в [0, 1]; N-позиции = 0; 1 720 уровней.
+
+**Лидерборд:** — (заполнить после отправки)
+
+**Теги:** `CNN`, `Ensemble`, `Raw` + свои `multi-species`, `InitiationNet`, `BPNet`.
+
+**Текст для формы сабмита (EN):**
+> Blend of sequence-only CNNs, z-scored scores combined with weights 0.5 (model A) and 0.5 (model B), rank-power quantised (alpha = 0.70).
+> Model A: InitiationNet-style multi-scale CNN with attention, 2 seeds, pretrained jointly on six species with per-species heads, then fine-tuned on ilPloInte3.2.
+> Model B: earlier blend of that kind of CNN (0.6) and a BPNet/ProCapNet-style dilated CNN (0.4), both trained on Ofas_2.0 and other species' training data.
+> No external data or pretrained third-party weights. Blend weights and alpha fixed in advance; hold-out contigs of this species were seen during training.
+
+---
+
+## 2026-10-18 · ilPloInte3.2 (моль) · смесь m3ft (вес 0.3) + прежний сабмит, alpha 0.70
+
+**Файл:** `ilPloInte3.2.predictions.blend_m3ft_w0.3_old.alpha0.70.txt.gz`. Kaggle `k13polinaa/epic-moth-blend-m3ft` (версия 1, CPU) → Output → `moth_blend/`.
+Скрипт `tools/blend_moth_m3ft.py` (ветка `claude/week0-code`). Источники: `k13polinaa/epic-v2-m3ft-moth` (`test_lograte.npy`) и `k13polinaa/epic-v3-moth-blend` (`test_final_score.npy`, это смесь 0.6 v2 + 0.4 v3 прежнего сабмита 0.2400 / 0.5414).
+
+**Модель:** 0.3 × z(m3ft) + 0.7 × z(прежняя смесь), rank-power quantisation alpha 0.70 (как у прежнего сабмита). Корреляция Spearman между входами 0.80 (2 млн позиций).
+Вес и alpha заданы заранее, не подобраны: обе модели видели все контиги моли, честной оценки нет. Оценка только по лидерборду, база 0.23752 / 0.55 (m3ft) и 0.2400 / 0.5414.
+
+**Проверки файла:** 113 971 908 строк = позиций шаблона; значения в [0, 1]; N-позиции = 0; 1 720 уровней.
+
+**Лидерборд:** — (заполнить после отправки)
+
+**Теги:** `CNN`, `Ensemble`, `Raw` + свои `multi-species`, `InitiationNet`, `BPNet`.
+
+**Текст для формы сабмита (EN):**
+> Blend of sequence-only CNNs, z-scored scores combined with weights 0.3 (model A) and 0.7 (model B), rank-power quantised (alpha = 0.70).
+> Model A: InitiationNet-style multi-scale CNN with attention, 2 seeds, pretrained jointly on six species with per-species heads, then fine-tuned on ilPloInte3.2.
+> Model B: earlier blend of that kind of CNN (0.6) and a BPNet/ProCapNet-style dilated CNN (0.4), both trained on Ofas_2.0 and other species' training data.
+> No external data or pretrained third-party weights. Blend weights and alpha fixed in advance; hold-out contigs of this species were seen during training.
+
+---
+
 ## 2026-10-18 · ilPloInte3.2 (моль) · v2 M-3 (претрейн на 6 видах + ft моли), alpha 0.65
 
 **Файл:** `ilPloInte3.2.predictions.txt.gz` (34.3 МБ). Kaggle `k13polinaa/epic-v2-m3ft-moth` (версия 1) → Output → `epic_runs/ilPloInte3.2/`.
