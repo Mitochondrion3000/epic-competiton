@@ -27,7 +27,7 @@ def write(ints, path, chunk=8_000_000):
             f = v % SCALE
             for k in range(6, 1, -1): buf[:, k] = ord("0") + f % 10; f //= 10
             fh.write(buf.tobytes())
-for w, alpha in ((0.5, 0.70), (0.3, 0.70)):
+for w, alpha in ((0.5, 0.70), (0.3, 0.70)):  # w07: см. kaggle epic-moth-blend-w07, тот же скрипт с ((0.7, 0.70),)
     ints = rank_power(w * zn + (1 - w) * zo, alpha)
     name = f"ilPloInte3.2.predictions.blend_m3ft_w{w:.1f}_old.alpha{alpha:.2f}.txt.gz"
     path = f"{OUT}/{name}"; write(ints, path)

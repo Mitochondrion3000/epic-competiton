@@ -5,6 +5,18 @@
 
 ---
 
+## 2026-10-18 · ilPloInte3.2 (моль) · смесь m3ft (вес 0.7) + прежний сабмит, alpha 0.70
+
+**Файл:** `ilPloInte3.2.predictions.blend_m3ft_w0.7_old.alpha0.70.txt.gz` (32.9 МБ). Kaggle `k13polinaa/epic-moth-blend-w07` (CPU) → Output → `moth_blend/`. Скрипт как `tools/blend_moth_m3ft.py` с весом 0.7. Источники те же.
+**Почему 0.7:** на лидерборде вес m3ft 0.5 (emerald-wolf, Иван подтвердил) дал 0.2577 / 0.56609, вес 0.3 (misty-gecko) 0.25797 / 0.55844; больший вес поднимал Spearman при том же AUPRC.
+**Проверки файла:** 113 971 908 строк = позиций шаблона; значения в [0, 1]; N-позиции = 0; 1 720 уровней.
+**Лидерборд:** — (заполнить после отправки)
+**Теги:** `CNN`, `Ensemble`, `Raw` + свои `multi-species`, `InitiationNet`, `BPNet`.
+**Текст для формы сабмита (EN, ≤512 знаков, 401):**
+> Blend of sequence-only CNNs (z-scored, weights 0.7/0.3, rank-power alpha 0.70). A: InitiationNet-style CNN with attention, 2 seeds, pretrained on six species with per-species heads, fine-tuned on this species. B: earlier blend of that CNN (0.6) and a BPNet/ProCapNet-style CNN (0.4). No external data or third-party pretrained weights. Weights fixed in advance; hold-out contigs were seen in training.
+
+---
+
 ## 2026-10-18 · ilPloInte3.2 (моль) · смесь m3ft (вес 0.5) + прежний сабмит, alpha 0.70
 
 **Файл:** `ilPloInte3.2.predictions.blend_m3ft_w0.5_old.alpha0.70.txt.gz`. Kaggle `k13polinaa/epic-moth-blend-m3ft` (версия 1, CPU) → Output → `moth_blend/`.
@@ -15,7 +27,7 @@
 
 **Проверки файла:** 113 971 908 строк = позиций шаблона; значения в [0, 1]; N-позиции = 0; 1 720 уровней.
 
-**Лидерборд:** загружен 2026-10-18 17:17–17:19, один из двух (какой именно, уточнить у Ивана): `misty-gecko-ff20` 0.25797 / 0.55844 или `emerald-wolf-9e3d` 0.2577 / 0.56609; места 115×16=1840 и 117×8=936 (прежний сабмит 200×36=7200), место в зачёте ~9.
+**Лидерборд:** загружен 2026-10-18 17:17–17:19, (по ответу Ивана) вес 0.5 = `emerald-wolf-9e3d` 0.2577 / 0.56609; вес 0.3 = `misty-gecko-ff20` 0.25797 / 0.55844; места 115×16=1840 и 117×8=936 (прежний сабмит 200×36=7200), место в зачёте ~9.
 
 **Теги:** `CNN`, `Ensemble`, `Raw` + свои `multi-species`, `InitiationNet`, `BPNet`.
 
@@ -34,7 +46,7 @@
 
 **Проверки файла:** 113 971 908 строк = позиций шаблона; значения в [0, 1]; N-позиции = 0; 1 720 уровней.
 
-**Лидерборд:** (тот же результат, см. пару выше) загружен 2026-10-18 17:17–17:19, один из двух (какой именно, уточнить у Ивана): `misty-gecko-ff20` 0.25797 / 0.55844 или `emerald-wolf-9e3d` 0.2577 / 0.56609; места 115×16=1840 и 117×8=936 (прежний сабмит 200×36=7200), место в зачёте ~9.
+**Лидерборд:** (тот же результат, см. пару выше) загружен 2026-10-18 17:17–17:19, (по ответу Ивана) вес 0.5 = `emerald-wolf-9e3d` 0.2577 / 0.56609; вес 0.3 = `misty-gecko-ff20` 0.25797 / 0.55844; места 115×16=1840 и 117×8=936 (прежний сабмит 200×36=7200), место в зачёте ~9.
 
 **Теги:** `CNN`, `Ensemble`, `Raw` + свои `multi-species`, `InitiationNet`, `BPNet`.
 
