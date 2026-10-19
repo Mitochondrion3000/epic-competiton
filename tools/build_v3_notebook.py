@@ -102,6 +102,8 @@ CFG = dict(
     # --- модель ---
     CH=256, N_LAYERS=9, STEM_K=21, PROF_K=75,
     COUNT_WEIGHT=1.0,         # вес MSE головы счёта относительно кросс-энтропии профиля
+    FP_WEIGHT=float(os.environ.get("EPIC_FP_WEIGHT", "0")),   # >0: окна, где счёт завышен (ложные срабатывания), весят в MSE счёта в (1+FP_WEIGHT) раз; 0 = как раньше
+    FP_TAU=float(os.environ.get("EPIC_FP_TAU", "0.5")),       # завышение счёта (в log1p), с которого окно считается ложным срабатыванием
     # --- обучение ---
     STEPS=int(os.environ.get("EPIC_STEPS", "30000")), BATCH=32, LR=float(os.environ.get("EPIC_LR", "5e-4")),   # 1e-3 в прогоне 2026-10-08: seed0 разошёлся
     WEIGHT_DECAY=1e-2, WARMUP=0.05,
@@ -562,7 +564,12 @@ def bpnet_loss(prof, cnt, y, mask, cfg):
     # Берём вес log(1 + tot): окна без прочтений не учат профиль, сильные важнее слабых, но без перекоса
     w = torch.log1p(tot)
     prof_loss = (w * ce).sum() / w.sum().clamp(min=1e-6)
-    cnt_loss = F.mse_loss(cnt.float(), torch.log1p(tot))
+    tgt = torch.log1p(tot)
+    if cfg.get("FP_WEIGHT", 0) > 0:      # hard-negative: переоценённые окна (FP) учат сильнее; недооценённые (слабые старты, вероятно шум) не усиливаем
+        fp = (cnt.float().detach() - tgt > cfg["FP_TAU"]).float()
+        cnt_loss = ((cnt.float() - tgt) ** 2 * (1 + cfg["FP_WEIGHT"] * fp)).mean()
+    else:
+        cnt_loss = F.mse_loss(cnt.float(), tgt)
     return prof_loss + cfg["COUNT_WEIGHT"] * cnt_loss, (prof_loss, cnt_loss)
 
 def to_lograte(prof, cnt, mask, crop):
