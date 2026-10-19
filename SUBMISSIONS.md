@@ -5,6 +5,35 @@
 
 ---
 
+## 2026-10-19 · Ofas_2.0 (клоп) · смесь m3ft (веса 0.5 / 0.3 / 0.7) + прежний сабмит, alpha 0.70
+
+**Файлы:** `Ofas_2.0.predictions.blend_m3ft_w0.5_old.alpha0.70.txt.gz` (51.5 МБ), `..._w0.3_...` (51.2 МБ), `..._w0.7_...` (51.7 МБ). Kaggle `k13polinaa/epic-bug-blend-m3ft` (CPU) → Output → `bug_blend/`.
+Скрипт `kaggle/v2_ab/epic-bug-blend-m3ft/blend.py` (как `tools/blend_moth_m3ft.py`, ветка `claude/week0-code`). Источники: `k13polinaa/epic-v2-m3ft-bug` (`test_lograte.npy`) и `k13polinaa/epic-v3-ofas-requant` (`test_final_score.npy`, это сабмит 0.6 v2 + 0.4 v3, лидерборд 0.2158 / 0.5015).
+
+**Модель:** w × z(m3ft) + (1 − w) × z(прежняя смесь), rank-power alpha 0.70 (как у прежнего сабмита). Корреляция Spearman между входами 0.80 (2 млн позиций).
+m3ft клопа: претрейн на 6 видах (`epic-v2-m3-pre2`, 80k шагов), затем ft на клопе 48k шагов, LR 6e-4, 2 сида (`epic-v2-m3ft-bug`, ≈2,5 ч на двух T4). Контиги report клопа в претрейн не входили.
+**Оценка на report (честная, 60 млн позиций):** m3ft отдельно, alpha 0.65: AUPRC 0.2217, Spearman 0.5204 (сиды 0.188 / 0.192); базовая одиночная модель 0.1685 / 0.4543; прежняя смесь на report 0.217 / 0.506. Смесь на report не считали: веса заданы заранее по опыту моли (0.3–0.5 лучше).
+**Проверки файла (все три):** 328 090 834 строки = позиций шаблона; значения в [0, 1]; N-позиции = 0; 1 720 уровней.
+**Лидерборд:** (заполнить после отправки).
+**Теги:** `CNN`, `Ensemble`, `Raw` + свои `multi-species`, `InitiationNet`, `BPNet`.
+**Текст для формы (EN, 431 знаков, вес 0.5; для 0.3 и 0.7 заменить «0.5/0.5» на «0.3/0.7» и «0.7/0.3»):**
+> Blend of sequence-only CNNs (z-scored, weights 0.5/0.5, rank-power alpha 0.70). A: InitiationNet-style CNN with attention, 2 seeds, pretrained on six species with per-species heads, fine-tuned on this species. B: earlier blend of an Ofas_2.0-only CNN (0.6) and a BPNet/ProCapNet-style CNN (0.4). No external data or third-party pretrained weights. Weights fixed in advance; A alone on held-out contigs: AUPRC 0.222, Spearman 0.520.
+
+---
+
+## 2026-10-19 · Ofas_2.0 (клоп) · m3ft отдельно, alpha 0.65
+
+**Файл:** `Ofas_2.0.predictions.txt.gz`. Kaggle `k13polinaa/epic-v2-m3ft-bug` → Output → `epic_runs/Ofas_2.0/` (alpha 0.65 выбрана ядром по правилу KEEP_FRAC на tune).
+**Модель:** v2 (InitiationNet + attention), претрейн на 6 видах + ft на клопе, 2 сида (`Ofas_2.0_m3ftbug_seed0/1.pt` там же).
+**Оценка на report (честная):** AUPRC 0.2217, Spearman 0.5204 (одиночная база 0.1685 / 0.4543; прежняя смесь 0.217 / 0.506).
+**Проверки файла:** ⚠ построчно не перепроверялся (файл записан тем же кодом, что прежние сабмиты, проверка на 3,2 млн позиций прошла). Если загружать этот файл, сначала запустить проверку на 328 090 834 строки.
+**Лидерборд:** (заполнить после отправки).
+**Теги:** `CNN`, `Ensemble`, `Raw` + свои `multi-species`, `InitiationNet`.
+**Текст для формы (EN, 324 знаков):**
+> Sequence-only InitiationNet-style CNN with attention (2-seed ensemble), pretrained jointly on six species with per-species heads (80k steps), then fine-tuned on Ofas_2.0 (48k steps); rank-power alpha 0.65. No external data or third-party pretrained weights. Held-out contigs, unseen in training: AUPRC 0.222, Spearman 0.520.
+
+---
+
 ## 2026-10-18 · ilPloInte3.2 (моль) · смесь m3ft (вес 0.7) + прежний сабмит, alpha 0.70
 
 **Файл:** `ilPloInte3.2.predictions.blend_m3ft_w0.7_old.alpha0.70.txt.gz` (32.9 МБ). Kaggle `k13polinaa/epic-moth-blend-w07` (CPU) → Output → `moth_blend/`. Скрипт как `tools/blend_moth_m3ft.py` с весом 0.7. Источники те же.
