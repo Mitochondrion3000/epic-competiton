@@ -162,7 +162,11 @@ def download_dataset(species, data_dir):
     if not local: os.remove(src)
 
 BASES = {}
+_cached = {os.path.basename(os.path.dirname(f)) for f in glob.glob("/kaggle/input/**/cache/*/DONE", recursive=True)} \
+    if os.environ.get("EPIC_CACHE_DIR") == "auto" else set()
 for sp in SPECIES:
+    if sp in _cached and (sp != TARGET or os.environ.get("EPIC_TRAIN_ONLY") == "1"):   # вспомогательный вид берётся из кэша: не качаем и не распаковываем архив (~40 мин)
+        print(sp, "-> из кэша"); continue
     download_dataset(sp, DATA_DIR)
     BASES[sp] = os.path.dirname(sorted(glob.glob(f"{DATA_DIR}/{sp}*/for_participants"))[0])
     print(sp, "->", BASES[sp])

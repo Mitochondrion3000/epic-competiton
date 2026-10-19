@@ -10,6 +10,7 @@ account = next((a.split("=", 1)[1] for a in sys.argv if a.startswith("--account=
 root = os.path.dirname(os.path.abspath(__file__)); repo = os.path.dirname(os.path.dirname(root))
 nb = json.load(open(f"{repo}/epic_v3_bpnet.ipynb")); env_d = json.loads(envj)
 if prep_only: env_d["EPIC_PREP_CACHE"] = "1"
+if train_only: env_d["EPIC_TRAIN_ONLY"] = "1"
 env = "import os\n" + "".join(f"os.environ[{k!r}] = {str(v)!r}\n" for k, v in env_d.items()) + 'print("env:", {k: v for k, v in os.environ.items() if k.startswith("EPIC_")})'
 first = lambda pre: next(i for i, c in enumerate(nb["cells"]) if "".join(c["source"]).startswith(pre))
 if prep_only: nb["cells"] = nb["cells"][:first("# 2.1 ") + 1]
