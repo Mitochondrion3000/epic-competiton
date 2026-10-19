@@ -103,6 +103,7 @@ CFG = dict(
     CH=256, N_LAYERS=9, STEM_K=21, PROF_K=75,
     COUNT_WEIGHT=1.0,         # вес MSE головы счёта относительно кросс-энтропии профиля
     FP_WEIGHT=float(os.environ.get("EPIC_FP_WEIGHT", "0")),   # >0: окна, где счёт завышен (ложные срабатывания), весят в MSE счёта в (1+FP_WEIGHT) раз; 0 = как раньше
+    AB_FP=float(os.environ.get("EPIC_AB_FP", "0")),           # >0: A/B на двух картах: сид 0 = контроль, сид 1 = FP_WEIGHT=AB_FP; оба с одним RNG и стартом от сида 0 претрейна
     FP_TAU=float(os.environ.get("EPIC_FP_TAU", "0.5")),       # завышение счёта (в log1p), с которого окно считается ложным срабатыванием
     # --- обучение ---
     STEPS=int(os.environ.get("EPIC_STEPS", "30000")), BATCH=32, LR=float(os.environ.get("EPIC_LR", "5e-4")),   # 1e-3 в прогоне 2026-10-08: seed0 разошёлся
@@ -121,7 +122,7 @@ CFG = dict(
 )
 if FAST_DEV:
     CFG.update(WIN=1024, CROP=256, CH=16, N_LAYERS=4, STEM_K=11, PROF_K=15, STEPS=40, BATCH=4,
-               EVAL_EVERY=20, EVAL_BP=60_000, N_SEEDS=1, CKPT_EVERY=20, PRED_BATCH=8)
+               EVAL_EVERY=20, EVAL_BP=60_000, N_SEEDS=2 if CFG["AB_FP"] > 0 else 1, CKPT_EVERY=20, PRED_BATCH=8)
 print("платформа:", "Kaggle" if ON_KAGGLE else "Colab" if ON_COLAB else "другая", "| целевой вид:", TARGET, "| вспомогательные:", AUX, "| FAST_DEV:", FAST_DEV)
 print("данные:", DATA_DIR, "| результаты:", OUT_DIR)
 display(pd.Series({k: str(v) for k, v in CFG.items()}, name="значение").to_frame())
@@ -636,6 +637,9 @@ INIT_LOCK = threading.Lock()
 
 def train_model(cfg, seed, gpu=None):
     if gpu is not None: torch.cuda.set_device(gpu)
+    rng_seed = seed
+    if cfg.get("AB_FP", 0) > 0:      # A/B: общий RNG и общий старт, различается только вес FP
+        rng_seed = 0; cfg = {**cfg, "FP_WEIGHT": cfg["AB_FP"] if seed == 1 else 0.0}
     final = ckpt_path(seed); last = final.replace(".pt", ".last.pt")
     if os.path.exists(final):
         ck = torch.load(final, map_location=DEVICE, weights_only=False)
@@ -651,11 +655,11 @@ def train_model(cfg, seed, gpu=None):
         cfg = {**state["cfg"], **{k: cfg[k] for k in SESSION_KEYS if k in cfg}}
 
     with INIT_LOCK:
-        random.seed(seed); np.random.seed(seed); torch.default_generator.manual_seed(seed)
-        if DEVICE == "cuda": torch.cuda.manual_seed(seed)
+        random.seed(rng_seed); np.random.seed(rng_seed); torch.default_generator.manual_seed(rng_seed)
+        if DEVICE == "cuda": torch.cuda.manual_seed(rng_seed)
         net = build_model(cfg).to(DEVICE)
     if INIT_FROM and state is None:     # старт с готовой сети: общее тело как есть, головы по названию вида
-        _p = INIT_FROM.format(seed=seed); _c = sorted(glob.glob(_p, recursive=True)); assert _c, f"нет весов для старта: {_p}"
+        _p = INIT_FROM.format(seed=rng_seed); _c = sorted(glob.glob(_p, recursive=True)); assert _c, f"нет весов для старта: {_p}"
         _ck = torch.load(_c[0], map_location="cpu", weights_only=False); _src = list(_ck["cfg"]["SPECIES"]); _sd = net.state_dict(); _n = 0
         for k, v in _ck["model"].items():
             if k.startswith(("prof.", "count.")): continue
@@ -670,7 +674,7 @@ def train_model(cfg, seed, gpu=None):
     opt = torch.optim.AdamW(net.parameters(), lr=cfg["LR"], weight_decay=cfg["WEIGHT_DECAY"])
     sched = torch.optim.lr_scheduler.OneCycleLR(opt, max_lr=cfg["LR"], total_steps=cfg["STEPS"], pct_start=cfg["WARMUP"])
     scaler = torch.amp.GradScaler("cuda", enabled=(AMP_DTYPE == torch.float16))
-    sampler = MultiSampler(cfg, seed)
+    sampler = MultiSampler(cfg, rng_seed)
     hist, evals, best, best_state, bad, start = [], [], -1.0, None, 0, 1
     lr_scale, rollbacks, run_loss = 1.0, 0, None
     rand_level = float((EVAL_SET["y"][EVAL_SET["mask"]] > 0).mean())
@@ -765,6 +769,10 @@ else:
     done = train_on_gpu(0)
 done.sort(key=lambda r: r[0])
 MODELS = [net for _, net, _, _ in done]
+if CFG.get("AB_FP", 0) > 0:      # A/B: метрики каждой модели отдельно на hold-out report (в обучении не участвовал и для отбора весов не использовался)
+    _ev = make_eval_set(GROUPS["report"], CFG)
+    for (_s, _n, _, _), _lab in zip(done, ("контроль", f"FP_WEIGHT={CFG['AB_FP']:g}")):
+        _r = quick_eval([_n], _ev, CFG); print(f"A/B report, {_lab}: AUPRC {_r['AUPRC']:.4f}, Spearman {_r['Spearman']:.4f}")
 if CKPT_FROM != TARGET:
     ck_species = list(torch.load(ckpt_path(done[0][0]), map_location="cpu", weights_only=False)["cfg"]["SPECIES"])
     assert TARGET in ck_species, f"в весах {CKPT_FROM} нет головы для {TARGET}: {ck_species}"
