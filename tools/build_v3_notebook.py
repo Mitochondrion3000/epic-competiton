@@ -68,6 +68,10 @@ USE_GT_TEST = os.environ.get("EPIC_USE_GT_TEST", "1") == "1"   # тест всп
 # EPIC_CKPT_FROM: взять готовые веса, обученные для другого целевого вида (например Ofas_2.0, где моль и устрица были
 # вспомогательными), и предсказать TARGET его собственными головами. Обучения при этом нет
 CKPT_FROM = os.environ.get("EPIC_CKPT_FROM", TARGET)
+# EPIC_INIT_FROM: шаблон пути к весам (с {seed}) для старта обучения с готовой сети: общее тело копируется, головы переносятся по названию вида
+INIT_FROM = os.environ.get("EPIC_INIT_FROM", "")
+# EPIC_PREP_CACHE=1: записать разобранные данные видов в /kaggle/working/cache (бесплатное CPU-ядро); EPIC_CACHE_DIR=auto: читать их из Input
+PREP_CACHE = os.environ.get("EPIC_PREP_CACHE") == "1"
 HEAD = 0            # номер головы целевого вида; при CKPT_FROM != TARGET уточняется после загрузки весов (раздел 6.4)
 
 ON_KAGGLE = os.path.isdir("/kaggle/working")
@@ -94,18 +98,18 @@ CFG = dict(
     HOLDOUT_FRAC=0.05,        # как в v2: группы tune/report совпадут с v2 (нужно для ансамбля)
     USE_LOWERCASE=True,       # флаг строчной буквы (мягкая маска повторов) на входе
     POS_FRAC=0.5,             # доля окон вокруг положительной позиции
-    TARGET_WEIGHT=0.5,        # доля окон целевого вида в батче; остальное поровну между AUX
+    TARGET_WEIGHT=float(os.environ.get("EPIC_TARGET_WEIGHT", "0.5")),   # доля окон целевого вида в батче; остальное поровну между AUX
     # --- модель ---
     CH=256, N_LAYERS=9, STEM_K=21, PROF_K=75,
     COUNT_WEIGHT=1.0,         # вес MSE головы счёта относительно кросс-энтропии профиля
     # --- обучение ---
-    STEPS=30000, BATCH=32, LR=float(os.environ.get("EPIC_LR", "5e-4")),   # 1e-3 в прогоне 2026-10-08: seed0 разошёлся
+    STEPS=int(os.environ.get("EPIC_STEPS", "30000")), BATCH=32, LR=float(os.environ.get("EPIC_LR", "5e-4")),   # 1e-3 в прогоне 2026-10-08: seed0 разошёлся
     WEIGHT_DECAY=1e-2, WARMUP=0.05,
     DIVERGE_FRAC=0.5, EMA_DECAY=0.999,
     EVAL_EVERY=2000, EVAL_BP=4_000_000,
     N_SEEDS=int(os.environ.get("EPIC_N_SEEDS", "2")), CKPT_EVERY=1000,
     HO_MAX_BP=int(float(os.environ.get("EPIC_HO_MAX_BP", "0")) * 1e6) or None,   # оценка tune/report на выборке (Мб на группу): огромные хромосомы не влезают в память
-    STOP_AFTER_HOURS=11.0 if ON_KAGGLE else None,
+    STOP_AFTER_HOURS=float(os.environ.get("EPIC_STOP_HOURS", "11.0")) if ON_KAGGLE else None,   # жёсткий самостоп сессии (чекпоинт + RESUME при перезапуске)
     # --- предсказание и постобработка ---
     TTA_SHIFTS=2, PRED_BATCH=32,
     KEEP_MODEL_FRAC=0.8,
@@ -244,7 +248,44 @@ def load_species(sp, with_test):
         track[c] = dict(pos=d.pos.values.astype(np.int64), strand=d.strand.values.astype(np.int64), tot=d.tot.values.astype(np.float32))
     return dict(name=sp, wl=wl, tpl=tpl, train=train_c, test=test_c, genome=genome, in_wl=in_wl, track=track, files=[os.path.basename(f) for f in files])
 
-DS = {sp: load_species(sp, sp == TARGET) for sp in SPECIES}
+# --- кэш разобранных данных: по виду геном одним плоским файлом (иначе тысячи мелких контигов), остальное в pickle
+CACHE_IN = None
+if os.environ.get("EPIC_CACHE_DIR") == "auto":
+    _f = sorted(glob.glob("/kaggle/input/**/cache/*/DONE", recursive=True))
+    CACHE_IN = os.path.dirname(os.path.dirname(_f[0])) if _f else None
+CACHE_OUT = f"{OUT_DIR}/cache" if PREP_CACHE else None
+print("кэш на входе:", CACHE_IN, "| пишем кэш в:", CACHE_OUT)
+
+def cache_save(sp, d):
+    o = f"{CACHE_OUT}/{sp}"; os.makedirs(o, exist_ok=True)
+    names = list(d["genome"]); offs = np.cumsum([0] + [len(d["genome"][c]) for c in names])
+    flat = np.lib.format.open_memmap(f"{o}/genome.npy", mode="w+", dtype=np.uint8, shape=(int(offs[-1]),))
+    for c, a in zip(names, offs[:-1]): flat[a:a + len(d["genome"][c])] = d["genome"][c]
+    flat.flush(); del flat
+    meta = {k: d[k] for k in ("name", "wl", "tpl", "train", "test", "track", "files")}
+    pd.to_pickle(dict(names=names, offs=offs, **meta), f"{o}/meta.pkl"); open(f"{o}/DONE", "w").write("ok")
+    print(f"кэш {sp}: {offs[-1] / 1e9:.2f} Гб генома, {len(names)} контигов")
+
+def load_species_cached(sp, with_test):
+    if CACHE_IN and os.path.exists(f"{CACHE_IN}/{sp}/DONE"):
+        m = pd.read_pickle(f"{CACHE_IN}/{sp}/meta.pkl"); flat = np.load(f"{CACHE_IN}/{sp}/genome.npy", mmap_mode="r")
+        genome = {c: flat[a:b] for c, a, b in zip(m["names"], m["offs"][:-1], m["offs"][1:])}
+        tpl = m["tpl"] if with_test else None; test_c = m["test"] if with_test else []
+        in_wl = {c: np.zeros(len(genome[c]), bool) for c in m["train"] + test_c}
+        for c, s_, e_ in zip(m["wl"].chrom, m["wl"].start, m["wl"].end): in_wl[c][s_:e_] = True
+        if with_test:
+            for c, s_, e_ in zip(tpl.chrom, tpl.start, tpl.end): in_wl[c][s_:e_] = True
+        print(f"{sp}: из кэша (тест {'в шаблоне' if with_test else 'не нужен'})")
+        return dict(name=sp, wl=m["wl"], tpl=tpl, train=m["train"], test=test_c, genome=genome, in_wl=in_wl, track=m["track"], files=m["files"])
+    d = load_species(sp, with_test or PREP_CACHE and sp != "jaNemVect1.1")   # при записи кэша: тест-шаблон есть у всех соревновательных видов
+    if CACHE_OUT: cache_save(sp, d)
+    if PREP_CACHE and not with_test:    # данные кэша шире, чем нужно этому прогону: убираем тест
+        d["tpl"] = None; d["test"] = []
+        d["in_wl"] = {c: np.zeros(len(d["genome"][c]), bool) for c in d["train"]}
+        for c, s_, e_ in zip(d["wl"].chrom, d["wl"].start, d["wl"].end): d["in_wl"][c][s_:e_] = True
+    return d
+
+DS = {sp: load_species_cached(sp, sp == TARGET) for sp in SPECIES}
 T = DS[TARGET]
 
 info = {}
@@ -602,6 +643,18 @@ def train_model(cfg, seed, gpu=None):
         random.seed(seed); np.random.seed(seed); torch.default_generator.manual_seed(seed)
         if DEVICE == "cuda": torch.cuda.manual_seed(seed)
         net = build_model(cfg).to(DEVICE)
+    if INIT_FROM and state is None:     # старт с готовой сети: общее тело как есть, головы по названию вида
+        _p = INIT_FROM.format(seed=seed); _c = sorted(glob.glob(_p, recursive=True)); assert _c, f"нет весов для старта: {_p}"
+        _ck = torch.load(_c[0], map_location="cpu", weights_only=False); _src = list(_ck["cfg"]["SPECIES"]); _sd = net.state_dict(); _n = 0
+        for k, v in _ck["model"].items():
+            if k.startswith(("prof.", "count.")): continue
+            if k in _sd and _sd[k].shape == v.shape: _sd[k] = v.clone(); _n += 1
+        for j, sp_ in enumerate(cfg["SPECIES"]):
+            if sp_ not in _src: continue
+            i_ = _src.index(sp_)
+            for k in ("prof.weight", "prof.bias", "count.weight", "count.bias"): _sd[k][j] = _ck["model"][k][i_]
+        net.load_state_dict(_sd)
+        print(f"[seed {seed}] старт с {os.path.basename(_c[0])}: тело ({_n} тензоров), головы {[x for x in cfg['SPECIES'] if x in _src]} из {_src}")
     ema = EMA(net, cfg["EMA_DECAY"])
     opt = torch.optim.AdamW(net.parameters(), lr=cfg["LR"], weight_decay=cfg["WEIGHT_DECAY"])
     sched = torch.optim.lr_scheduler.OneCycleLR(opt, max_lr=cfg["LR"], total_steps=cfg["STEPS"], pct_start=cfg["WARMUP"])
