@@ -23,7 +23,7 @@
 **Модель:** BPNetMS (1,93 млн параметров, рецептивное поле ±1069 нт): претрейн на 6 видах (`epic-v3-m6-pre`, 30 000 шагов, 2 сида, 4,15 ч), ft на моли 16 000 шагов (`epic-v3-m6-ft-moth-ab`, 2,01 ч). Две модели в ансамбле: контроль и FP_WEIGHT=3 (вес ×4 для окон, где предсказанный счёт выше цели на 0,5).
 **Оценка на report (честная, hold-out не видел претрейн и ft):** ансамбль AUPRC 0.1913, Spearman 0.3431 (alpha 0.55 по tune, с поправкой n_ref); по одиночке 0.1797/0.3405 и 0.1823/0.3330. Лучшая одиночная v2 на моли для сравнения в этом же формате не считалась.
 **Проверки файла:** 113 971 908 строк = позиций шаблона; значения в [0, 1]; N-позиции = 0; 3 220 уровней.
-**Лидерборд:** (заполнить после отправки).
+**Лидерборд:** 2026-10-20 09:11 `950 jade-falcon-891d` (файл по времени и цифрам — v3 отдельно, alpha 0.55; Иван не называл файл): AUPRC 0.18066 / Spearman 0.36737, место сайта 283 (лучший наш 0.2577 / 0.566, место 24). Честный report дал 0.191 / 0.343, то есть оценка на report совпала с лидербордом.
 **Теги:** `CNN`, `Ensemble`, `Raw` + свои `multi-species`, `BPNet`.
 **Текст для формы (EN, 404 знаков):**
 > Sequence-only BPNet/ProCapNet-style dilated CNN (profile and count heads), pretrained jointly on six species with per-species heads, then fine-tuned on ilPloInte3.2. Ensemble of two models (one trained with extra weight on over-predicted false-positive windows), rank-power alpha 0.55. No external data or third-party pretrained weights. Held-out contigs, unseen in training: AUPRC 0.191, Spearman 0.343.
