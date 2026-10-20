@@ -5,6 +5,18 @@
 
 ---
 
+## 2026-10-20 · ilPloInte3.2 (моль) · смесь v3 (веса 0.3 / 0.5) + лучший файл, alpha 0.70
+
+**Файлы:** `ilPloInte3.2.predictions.blend_v3_w0.3_best.alpha0.70.txt.gz` и `..._w0.5_...` (по 31.9 МБ). Kaggle `k13polinaa/epic-moth-blend-v3` (CPU, ≈2,5 мин) → Output → `moth_blend_v3/`. Скрипт `kaggle/moth_blend_v3/blend.py`, ветка `claude/week0-code`.
+**Модель:** w × z(v3) + (1 − w) × z(лучший), где «лучший» = 0.5 z(m3ft) + 0.5 z(прежняя смесь) (это файл `blend_m3ft_w0.5_old.alpha0.70`, лидерборд 0.23205 / 0.49419 для клопа; для моли 0.2577 / 0.566). v3 = ансамбль контроль + FP3 (`ivanmitochondrion/epic-v3-m6-pred-moth`, `test_final_score.npy`). Spearman между лучшим и v3 на 2 млн позиций: 0.640.
+**Оценка:** смесь на report не считали (у m3ft и прежней смеси hold-out моли виден в обучении, честного report-сравнения нет); веса заданы заранее. v3 отдельно на честном report: AUPRC 0.1913, Spearman 0.3431.
+**Проверки файла (оба):** 113 971 908 строк = позиций шаблона; значения в [0, 1]; N-позиции = 0; 1 720 уровней.
+**Лидерборд:** (заполнить после отправки).
+**Теги:** `CNN`, `Ensemble`, `Raw` + свои `multi-species`, `InitiationNet`, `BPNet`.
+**Текст для формы (EN, 434 знаков, вес v3 0.3; для 0.5 заменить «0.3/0.7» на «0.5/0.5», 434 знаков):**
+> Blend of sequence-only CNNs (z-scored, weights 0.3/0.7, rank-power alpha 0.70). A: BPNet/ProCapNet-style dilated CNN, 2-model ensemble, pretrained on six species with per-species heads and fine-tuned on this species. B: earlier blend of InitiationNet-style CNNs (pretrained on six species, fine-tuned) and a species-specific CNN. No external data or third-party pretrained weights. Weights fixed in advance; not validated on hold-out.
+
+
 ## 2026-10-20 · ilPloInte3.2 (моль) · v3 BPNet, ансамбль контроль + FP_WEIGHT=3, alpha 0.55
 
 **Файл:** `ilPloInte3.2.predictions.txt.gz` (81.1 МБ). Kaggle `ivanmitochondrion/epic-v3-m6-pred-moth` (GPU T4×2, ≈17 мин) → Output → `epic_v3/ilPloInte3.2/` (там же `..alpha0.70..` и `..alpha0.80..`: хуже по tune, не нужны). Ветка `claude/week0-code`, `epic_v3_bpnet.ipynb`.
