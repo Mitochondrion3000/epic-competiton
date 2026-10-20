@@ -5,6 +5,18 @@
 
 ---
 
+## 2026-10-20 · ilPloInte3.2 (моль) · v3 BPNet, ансамбль контроль + FP_WEIGHT=3, alpha 0.55
+
+**Файл:** `ilPloInte3.2.predictions.txt.gz` (81.1 МБ). Kaggle `ivanmitochondrion/epic-v3-m6-pred-moth` (GPU T4×2, ≈17 мин) → Output → `epic_v3/ilPloInte3.2/` (там же `..alpha0.70..` и `..alpha0.80..`: хуже по tune, не нужны). Ветка `claude/week0-code`, `epic_v3_bpnet.ipynb`.
+**Модель:** BPNetMS (1,93 млн параметров, рецептивное поле ±1069 нт): претрейн на 6 видах (`epic-v3-m6-pre`, 30 000 шагов, 2 сида, 4,15 ч), ft на моли 16 000 шагов (`epic-v3-m6-ft-moth-ab`, 2,01 ч). Две модели в ансамбле: контроль и FP_WEIGHT=3 (вес ×4 для окон, где предсказанный счёт выше цели на 0,5).
+**Оценка на report (честная, hold-out не видел претрейн и ft):** ансамбль AUPRC 0.1913, Spearman 0.3431 (alpha 0.55 по tune, с поправкой n_ref); по одиночке 0.1797/0.3405 и 0.1823/0.3330. Лучшая одиночная v2 на моли для сравнения в этом же формате не считалась.
+**Проверки файла:** 113 971 908 строк = позиций шаблона; значения в [0, 1]; N-позиции = 0; 3 220 уровней.
+**Лидерборд:** (заполнить после отправки).
+**Теги:** `CNN`, `Ensemble`, `Raw` + свои `multi-species`, `BPNet`.
+**Текст для формы (EN, 404 знаков):**
+> Sequence-only BPNet/ProCapNet-style dilated CNN (profile and count heads), pretrained jointly on six species with per-species heads, then fine-tuned on ilPloInte3.2. Ensemble of two models (one trained with extra weight on over-predicted false-positive windows), rank-power alpha 0.55. No external data or third-party pretrained weights. Held-out contigs, unseen in training: AUPRC 0.191, Spearman 0.343.
+
+
 ## 2026-10-19 · Ofas_2.0 (клоп) · смесь m3ft (веса 0.5 / 0.3 / 0.7) + прежний сабмит, alpha 0.70
 
 **Файлы:** `Ofas_2.0.predictions.blend_m3ft_w0.5_old.alpha0.70.txt.gz` (51.5 МБ), `..._w0.3_...` (51.2 МБ), `..._w0.7_...` (51.7 МБ). Kaggle `k13polinaa/epic-bug-blend-m3ft` (CPU) → Output → `bug_blend/`.
