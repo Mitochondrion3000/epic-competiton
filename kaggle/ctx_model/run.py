@@ -6,7 +6,7 @@ subprocess.run([sys.executable, "-m", "pip", "install", "-q", "lightgbm"], check
 import lightgbm as lgb
 from sklearn.metrics import roc_auc_score, average_precision_score
 SP = os.environ.get("EPIC_SPECIES", "ilPloInte3.2"); MASK = int(os.environ.get("EPIC_MASK", "25")); RATE = float(os.environ.get("EPIC_RATE", "0.1"))
-WIN = (30, 100, 300, 1000, 3000); t0 = time.time(); rng = np.random.default_rng(0)
+WIN = tuple(int(x) for x in os.environ.get("EPIC_WIN", "30,100,300,1000,3000").split(",")); t0 = time.time(); rng = np.random.default_rng(0)
 d = os.path.dirname(sorted(glob.glob(f"/kaggle/input/**/cache/{SP}/DONE", recursive=True))[0])
 m = pd.read_pickle(f"{d}/meta.pkl"); flat = np.load(f"{d}/genome.npy", mmap_mode="r")
 print(SP, "контигов", len(m["names"]), "в whitelist", m["wl"].chrom.nunique(), flush=True)
@@ -51,7 +51,7 @@ for c in order:
                 F[f"{name}{w}_a"] = side(PA, lo_c, hi_c) / n; F[f"{name}{w}_t"] = side(PT, lo_c, hi_c) / n
         rows.append(pd.DataFrame(F))
 D = pd.concat(rows, ignore_index=True); print("кандидатов", len(D), "положительных", int((D.y > 0).sum()), f"{(time.time() - t0) / 60:.1f} мин", flush=True)
-cen = [f"c{k}" for k in range(-5, 6)]; ctx = [c for c in D.columns if c[:2] in ("up", "dn")] + ["contig_len"]
+cen = [f"c{k}" for k in range(-5, 6)]; ctx = [c for c in D.columns if c[:2] in ("up", "dn")] + ([] if os.environ.get("EPIC_NO_LEN") == "1" else ["contig_len"])
 tr_, ev = D[D.part == 0], D[D.part == 1]; res = []
 for name, cols in (("центр", cen), ("окружение", ctx), ("оба", cen + ctx)):
     mdl = lgb.LGBMClassifier(n_estimators=300, learning_rate=0.05, num_leaves=63, subsample=0.8, subsample_freq=1, colsample_bytree=0.8, verbose=-1)
@@ -61,5 +61,5 @@ for name, cols in (("центр", cen), ("окружение", ctx), ("оба", 
     res.append(row); print(row, flush=True)
     if name == "окружение":
         imp = pd.Series(mdl.feature_importances_, cols).sort_values(ascending=False); print(imp.head(12).to_string())
-pd.DataFrame(res).to_csv("/kaggle/working/ctx_result.csv", index=False)
+pd.DataFrame(res).to_csv(f"/kaggle/working/ctx_result_m{MASK}.csv", index=False)
 print("готово", f"{(time.time() - t0) / 60:.1f} мин")
