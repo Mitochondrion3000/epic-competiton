@@ -38,6 +38,11 @@ from IPython.display import display
 
 plt.rcParams.update({"figure.dpi": 110, "axes.grid": True, "grid.alpha": 0.3, "axes.spines.top": False, "axes.spines.right": False})
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+_KILL_H = float(os.environ.get("EPIC_KILL_HOURS", "0"))
+if _KILL_H > 0:      # жёсткий самостоп любого этапа (предсказание тоже): API Kaggle не умеет отменять ядро, а Иван может спать
+    def _watchdog():
+        time.sleep(_KILL_H * 3600); print(f"САМОСТОП: прошло {_KILL_H} ч, процесс завершается (сохранённые файлы остаются в Output)", flush=True); os._exit(3)
+    threading.Thread(target=_watchdog, daemon=True).start()
 if DEVICE == "cuda":
     major, _ = torch.cuda.get_device_capability()
     # У BPNet после каждой свёртки BatchNorm, активации ограничены -> float16 на T4 безопасен (шаги с inf пропускает GradScaler).
