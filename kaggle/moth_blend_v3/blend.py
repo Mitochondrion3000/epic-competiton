@@ -6,8 +6,8 @@ def find(pat, must):
 old = np.load(find("/kaggle/input/**/test_final_score.npy", "epic-v3-moth-blend")).astype(np.float64)
 nm = np.load(find("/kaggle/input/**/test_nmask.npy", "epic-v3-moth-blend")).astype(bool)
 new = np.load(find("/kaggle/input/**/test_lograte.npy", "epic-v2-m3ft-moth")).astype(np.float64)
-assert len(old) == len(new) == len(nm) == len(v3); ok = ~nm
 v3 = np.load(find("/kaggle/input/**/test_final_score.npy", "epic-v3-m6-pred-moth")).astype(np.float64)
+assert len(old) == len(new) == len(nm) == len(v3); ok = ~nm
 print(f"позиций {len(nm):,}, N {int(nm.sum()):,}")
 def z(x): mu, sd = x[ok].mean(), x[ok].std() + 1e-9; return (x - mu) / sd
 zo, zn, z3 = z(old), z(new), z(v3); del old, new, v3
