@@ -773,6 +773,11 @@ if CFG.get("AB_FP", 0) > 0:      # A/B: метрики каждой модели
     _ev = make_eval_set(GROUPS["report"], CFG)
     for (_s, _n, _, _), _lab in zip(done, ("контроль", f"FP_WEIGHT={CFG['AB_FP']:g}")):
         _r = quick_eval([_n], _ev, CFG); print(f"A/B report, {_lab}: AUPRC {_r['AUPRC']:.4f}, Spearman {_r['Spearman']:.4f}")
+    if os.environ.get("EPIC_DUMP_REPORT") == "1":     # сохраняем скоры report обеих моделей: смесь и пересечение ошибок считаем на CPU
+        _m = _ev["mask"]; _wid = np.broadcast_to(np.arange(len(_m))[:, None, None], _m.shape)[_m]
+        _d = dict(y=_ev["y"][_m], win=_wid)
+        for (_s, _n, _, _), _lab in zip(done, ("ctrl", "fp")): _d[_lab] = predict_windows([_n], _ev["codes"], _ev["masks"], CFG)[_m]
+        np.savez_compressed(f"{OUT_DIR}/report_scores_{TARGET}.npz", **_d); print("сохранены скоры report:", {k: v.shape for k, v in _d.items()})
 if CKPT_FROM != TARGET:
     ck_species = list(torch.load(ckpt_path(done[0][0]), map_location="cpu", weights_only=False)["cfg"]["SPECIES"])
     assert TARGET in ck_species, f"в весах {CKPT_FROM} нет головы для {TARGET}: {ck_species}"
