@@ -11,7 +11,7 @@
 **Модель:** w × z(v3) + (1 − w) × z(лучший), где «лучший» = 0.5 z(m3ft) + 0.5 z(прежняя смесь) (это файл `blend_m3ft_w0.5_old.alpha0.70`, лидерборд 0.23205 / 0.49419 для клопа; для моли 0.2577 / 0.566). v3 = ансамбль контроль + FP3 (`ivanmitochondrion/epic-v3-m6-pred-moth`, `test_final_score.npy`). Spearman между лучшим и v3 на 2 млн позиций: 0.640.
 **Оценка:** смесь на report не считали (у m3ft и прежней смеси hold-out моли виден в обучении, честного report-сравнения нет); веса заданы заранее. v3 отдельно на честном report: AUPRC 0.1913, Spearman 0.3431.
 **Проверки файла (оба):** 113 971 908 строк = позиций шаблона; значения в [0, 1]; N-позиции = 0; 1 720 уровней.
-**Лидерборд:** (заполнить после отправки).
+**Лидерборд:** 2026-10-20: вес v3 0.5 — `calm-bison-13b1` (10:46) 0.25051 / 0.51749, место сайта 159; вес v3 0.3 — `lunar-seal-d86f` (11:12) 0.25900 / 0.54742, место 61. Лучший наш (m3ft 0.5 + прежний, без v3) 0.2577 / 0.566: смесь с v3 при 0.3 даёт AUPRC +0,5%, Spearman −0.019, произведение мест хуже (11 против 9 среди команд по текущей таблице), при 0.5 хуже сильнее (14). Вывод: v3 в нынешнем виде для моли не помогает.
 **Теги:** `CNN`, `Ensemble`, `Raw` + свои `multi-species`, `InitiationNet`, `BPNet`.
 **Текст для формы (EN, 434 знаков, вес v3 0.3; для 0.5 заменить «0.3/0.7» на «0.5/0.5», 434 знаков):**
 > Blend of sequence-only CNNs (z-scored, weights 0.3/0.7, rank-power alpha 0.70). A: BPNet/ProCapNet-style dilated CNN, 2-model ensemble, pretrained on six species with per-species heads and fine-tuned on this species. B: earlier blend of InitiationNet-style CNNs (pretrained on six species, fine-tuned) and a species-specific CNN. No external data or third-party pretrained weights. Weights fixed in advance; not validated on hold-out.
