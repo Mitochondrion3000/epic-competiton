@@ -1,0 +1,14 @@
+{
+  "id": "ivanmitochondrion/epic-rerank-ctx",
+  "title": "epic-rerank-ctx",
+  "code_file": "run.py",
+  "language": "python",
+  "kernel_type": "script",
+  "is_private": true,
+  "enable_gpu": false,
+  "enable_tpu": false,
+  "enable_internet": true,
+  "dataset_sources": [],
+  "competition_sources": [],
+  "kernel_sources": ["ivanmitochondrion/epic-v3-m6-prep", "ivanmitochondrion/epic-v3-m6-pred-moth"]
+}
