@@ -5,6 +5,28 @@
 
 ---
 
+## 2026-10-21 · cgigas_uk_roslin_v1 (устрица) · смесь m3ft (веса 0.5 / 0.3) + прежний сабмит, alpha 0.65
+
+**Файлы:** `cgigas_uk_roslin_v1.predictions.blend_m3ft_w0.5_old.alpha0.65.txt.gz` и `…_w0.3_…` (по ≈77.6 МБ). Kaggle `k13polinaa/epic-blend-m3ft-oyster` (CPU) → Output → `m3ft_blend/`. Скрипт `kaggle/blend_m3ft_oyster/blend.py`, ветка `claude/week0-code`, коммит `c542c62`.
+**Модель:** w × z(m3ft) + (1 − w) × z(прежний). m3ft = `k13polinaa/epic-v2-m3ft-oyster`: v2 InitiationNet, претрейн на шести видах (`epic-v2-m3-pre2`, головы видов), дообучение на cgigas_uk_roslin_v1, 48 000 шагов, 2 сида, 2 T4 (≈2,8 ч). Прежний = v2 ft2 (дообучение от моли, 2 сида) (`epic-v2-ft2-oyster`). Spearman между входами на 2 млн позиций: 0.883.
+**Оценка:** честного report нет (претрейн видел контиги report), по сидам m3ft AUPRC 0.115 / 0.118 (сырое, alpha tune 0.55). Прежний ft2 на честных контигах: AUPRC 0.120, Spearman 0.316. Веса заданы заранее, смесь на report не считали.
+**Проверки файла (оба):** 198 420 888 строк = позиций шаблона; значения в [0, 1]; N-позиции = 0; 2 096 уровней.
+**Лидерборд:** —
+**Теги:** `CNN`, `Ensemble`, `Finetune`, `Raw` + свои `multi-species`, `InitiationNet`.
+**Текст для формы (EN, 441 знаков; для веса 0.3 заменить «0.5/0.5» на «0.3/0.7», 441 знаков):**
+> Blend of sequence-only CNNs (z-scored, m3ft weight 0.5/0.5, rank-power alpha 0.65). A: multi-scale CNN with attention, pretrained jointly on six EPIC species with per-species heads and fine-tuned on this species training data (2 seeds). B: earlier model: v2 CNN fine-tuned from a model pretrained on other EPIC species (2 seeds). No external data or third-party pretrained weights. Weights fixed in advance; not validated on honest hold-out.
+
+## 2026-10-21 · sSquSuc5.hap2 (акула) · смесь m3ft (веса 0.5 / 0.3) + прежний сабмит, alpha 0.65
+
+**Файлы:** `sSquSuc5.hap2.predictions.blend_m3ft_w0.5_old.alpha0.65.txt.gz` и `…_w0.3_…` (по ≈124.9 МБ). Kaggle `k13polinaa/epic-blend-m3ft-shark` (CPU) → Output → `m3ft_blend/`. Скрипт `kaggle/blend_m3ft_shark/blend.py`, ветка `claude/week0-code`, коммит `c542c62`.
+**Модель:** w × z(m3ft) + (1 − w) × z(прежний). m3ft = `k13polinaa/epic-v2-m3ft-shark`: v2 InitiationNet, претрейн на шести видах (`epic-v2-m3-pre2`, головы видов), дообучение на sSquSuc5.hap2, 48 000 шагов, 2 сида, 2 T4 (≈2,8 ч). Прежний = смесь v2 ft2 + v3 (вес v3 0.3, alpha 0.55; на сайте 0.1206 / 0.4625) (`epic-blend-shark`). Spearman между входами на 2 млн позиций: 0.889.
+**Оценка:** честного report нет (претрейн видел контиги report), по сидам m3ft AUPRC 0.122 / 0.094 (сырое, alpha tune 0.65). Прежний ft2 на честных контигах: AUPRC 0.102, Spearman 0.335. Веса заданы заранее, смесь на report не считали.
+**Проверки файла (оба):** 344 993 974 строк = позиций шаблона; значения в [0, 1]; N-позиции = 0; 2 096 уровней.
+**Лидерборд:** —
+**Теги:** `CNN`, `Ensemble`, `Finetune`, `Raw` + свои `multi-species`, `InitiationNet`.
+**Текст для формы (EN, 437 знаков; для веса 0.3 заменить «0.5/0.5» на «0.3/0.7», 437 знаков):**
+> Blend of sequence-only CNNs (z-scored, m3ft weight 0.5/0.5, rank-power alpha 0.65). A: multi-scale CNN with attention, pretrained jointly on six EPIC species with per-species heads and fine-tuned on this species training data (2 seeds). B: earlier model: blend of that v2 CNN (2 seeds) and a species-specific BPNet-style CNN. No external data or third-party pretrained weights. Weights fixed in advance; not validated on honest hold-out.
+
 ## 2026-10-20 · ilPloInte3.2 (моль) · смесь v3 (веса 0.3 / 0.5) + лучший файл, alpha 0.70
 
 **Файлы:** `ilPloInte3.2.predictions.blend_v3_w0.3_best.alpha0.70.txt.gz` и `..._w0.5_...` (по 31.9 МБ). Kaggle `k13polinaa/epic-moth-blend-v3` (CPU, ≈2,5 мин) → Output → `moth_blend_v3/`. Скрипт `kaggle/moth_blend_v3/blend.py`, ветка `claude/week0-code`.
