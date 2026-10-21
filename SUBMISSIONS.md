@@ -5,6 +5,17 @@
 
 ---
 
+## 2026-10-21 · ASM119413v2 (осьминог) · смесь m3ft (веса 0.5 / 0.3) + v3, alpha 0.65
+
+**Файлы:** `ASM119413v2.predictions.blend_m3ft_w0.5_old.alpha0.65.txt.gz` и `…_w0.3_…` (по ≈110 МБ). Kaggle `k13polinaa/epic-blend-m3ft-octopus` (CPU) → Output → `m3ft_blend/`. Скрипт `kaggle/blend_m3ft_octopus/blend.py`, ветка `claude/week0-code`, коммит `3425bff`.
+**Модель:** w × z(m3ft) + (1 − w) × z(v3). m3ft = `k13polinaa/epic-v2-m3ft-octopus`: v2 InitiationNet, претрейн на шести видах (`epic-v2-m3-pre2`, голова осьминога), дообучение на ASM119413v2, 48 000 шагов, 2 сида, 2 T4. v3 = BPNet на данных осьминога + устрицы (`epic-v3-octopus-pred`, на сайте `keen-falcon-b0df` 0.0699 / 0.3858). Spearman между входами на 2 млн позиций: 0.648 (меньше, чем у устрицы и акулы, больше разнообразия).
+**Оценка:** честного report нет (претрейн видел контиги report): по сидам m3ft AUPRC 0.078 / 0.068, Spearman 0.260 / 0.256 (сырое), alpha tune 0.6. Прежний ft2 на честных контигах: AUPRC 0.079, Spearman 0.261. Веса заданы заранее.
+**Проверки файла (оба):** 416 885 800 строк = позиций шаблона; значения в [0, 1]; N-позиции = 0; 2 096 уровней.
+**Лидерборд:** —
+**Теги:** `CNN`, `Ensemble`, `Finetune`, `Raw` + свои `multi-species`, `InitiationNet`, `BPNet`.
+**Текст для формы (EN, 455 знаков; для веса 0.3 заменить «0.5/0.5» на «0.3/0.7», 455 знаков):**
+> Blend of sequence-only CNNs (z-scored, m3ft weight 0.5/0.5, rank-power alpha 0.65). A: multi-scale CNN with attention, pretrained jointly on six EPIC species with per-species heads and fine-tuned on this species training data (2 seeds). B: earlier model: BPNet/ProCapNet-style dilated CNN trained on this species plus Magallana data (2 seeds). No external data or third-party pretrained weights. Weights fixed in advance; not validated on honest hold-out.
+
 ## 2026-10-21 · cgigas_uk_roslin_v1 (устрица) · смесь m3ft (веса 0.5 / 0.3) + прежний сабмит, alpha 0.65
 
 **Файлы:** `cgigas_uk_roslin_v1.predictions.blend_m3ft_w0.5_old.alpha0.65.txt.gz` и `…_w0.3_…` (по ≈77.6 МБ). Kaggle `k13polinaa/epic-blend-m3ft-oyster` (CPU) → Output → `m3ft_blend/`. Скрипт `kaggle/blend_m3ft_oyster/blend.py`, ветка `claude/week0-code`, коммит `c542c62`.
