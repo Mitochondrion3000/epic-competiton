@@ -1,0 +1,18 @@
+{
+ "id": "k13polinaa/epic-blend-m3ft-oyster",
+ "title": "epic-blend-m3ft-oyster",
+ "code_file": "blend.py",
+ "language": "python",
+ "kernel_type": "script",
+ "is_private": true,
+ "enable_gpu": false,
+ "enable_tpu": false,
+ "enable_internet": true,
+ "dataset_sources": [],
+ "competition_sources": [],
+ "kernel_sources": [
+  "k13polinaa/epic-v2-m3ft-oyster",
+  "k13polinaa/epic-v2-ft2-oyster",
+  "k13polinaa/epic-v3-oyster"
+ ]
+}
