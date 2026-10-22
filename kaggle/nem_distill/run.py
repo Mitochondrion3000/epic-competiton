@@ -16,7 +16,7 @@ import final as FN, scoring as S
 SP = "jaNemVect1.1"
 K = int(os.environ.get("EPIC_K", "32")); FOLD = int(os.environ.get("EPIC_FOLD", "0"))
 STEPS = int(os.environ.get("EPIC_STEPS", "60" if SMOKE else "8000"))
-TAG = f"k{K}_f{FOLD}"
+TAG = f"k{K}_f{FOLD}" + os.environ.get("EPIC_TAGX", "")
 DATA = "/tmp/epic" if KAGGLE else "/home/user/epic_data"
 OUT = "/kaggle/working" if KAGGLE else "/tmp/distill_out"
 os.makedirs(OUT, exist_ok=True)
@@ -64,7 +64,8 @@ for c, s, a, b, o in zip(te.chrom, te.strand, te.start, te.end, te.off):
     if s == "+": tk["tgt"][a:b] = v
     else: tk["tgt"][n - b:n - a] = v[::-1]
 fin = np.concatenate([TR[k]["tgt"][np.isfinite(TR[k]["tgt"])] for k in TR if k[0] in tr_c])
-MU, SD = float(fin.mean()), float(fin.std()); Q = float(np.quantile(fin, 0.995)); del fin
+MU, SD = float(fin.mean()), float(fin.std()); Q = float(np.quantile(fin, 0.995)); Q95 = float(np.quantile(fin, 0.95)); del fin
+PEAKW = float(os.environ.get("EPIC_PEAKW", "3")); TOPFR = float(os.environ.get("EPIC_TOPFR", "0.4"))
 log(f"цель: среднее {MU:.3f}, sd {SD:.3f}, q99.5 {Q:.3f}")
 
 def intervals(cs):
@@ -88,7 +89,7 @@ class Sampler:
     def batch(s, B=64):
         X = np.zeros((B, 4, L + LEFT + RIGHT), np.float32); Y = np.full((B, L), np.nan, np.float32)
         for i in range(B):
-            if s.top and s.r.random() < 0.4: k, q = s.top[s.r.integers(len(s.top))]
+            if s.top and s.r.random() < TOPFR: k, q = s.top[s.r.integers(len(s.top))]
             else:
                 k, a, b = s.iv[s.r.choice(len(s.iv), p=s.p)]; q = s.r.integers(a, b)
             st = q - s.r.integers(L); tk = TR[k]
@@ -122,7 +123,7 @@ net = Net().to(DEV)
 
 def loss_fn(X, Y, lam=0.05):
     z = net(X.to(DEV)); y = ((Y - MU) / SD).to(DEV); m = torch.isfinite(y)
-    wt = 1.0 + 3.0 * (Y.to(DEV) > Q).float()
+    Yd = Y.to(DEV); wt = 1.0 + PEAKW * (Yd > Q).float() + PEAKW / 3 * (Yd > Q95).float()
     mse = (((z - torch.nan_to_num(y)) ** 2) * wt)[m].sum() / wt[m].sum()
     return mse, mse + lam * net.roughness()
 
