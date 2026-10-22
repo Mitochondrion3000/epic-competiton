@@ -3,3 +3,4 @@ __pycache__/
 submissions/
 kaggle/v2_ab/*/
 kaggle/v3_ms/*/
+kaggle/nem_distill/out_*/
