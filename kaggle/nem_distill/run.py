@@ -66,6 +66,7 @@ for c, s, a, b, o in zip(te.chrom, te.strand, te.start, te.end, te.off):
 fin = np.concatenate([TR[k]["tgt"][np.isfinite(TR[k]["tgt"])] for k in TR if k[0] in tr_c])
 MU, SD = float(fin.mean()), float(fin.std()); Q = float(np.quantile(fin, 0.995)); Q95 = float(np.quantile(fin, 0.95)); del fin
 PEAKW = float(os.environ.get("EPIC_PEAKW", "3")); TOPFR = float(os.environ.get("EPIC_TOPFR", "0.4"))
+PAIR = os.environ.get("EPIC_PAIR") == "1"; LAM_PAIR = float(os.environ.get("EPIC_LAM_PAIR", "0.01"))   # попарные взаимодействия компонент (L1)
 log(f"цель: среднее {MU:.3f}, sd {SD:.3f}, q99.5 {Q:.3f}")
 
 def intervals(cs):
@@ -109,12 +110,18 @@ class Net(nn.Module):
         s.curve = nn.Conv1d(K, K, UP + DOWN + 1, groups=K, bias=False)
         s.core = nn.Conv1d(4, 1, 2 * CORE + 1, bias=False)        # острый Инициатор: свободный вес каждой буквы в -CORE..+CORE
         s.bias = nn.Parameter(torch.zeros(1))
+        s.pw = nn.Parameter(torch.zeros(K, K))                    # вклад пары компонент: усиливает (+) или подавляет (-)
         with torch.no_grad():
             s.motif.weight.mul_(0.3); s.curve.weight.normal_(0, 1e-3)
             s.core.weight[0, :, :INR.shape[1]] = torch.tensor(INR) * 0.3
     def forward(s, x):
         z = s.curve(Fn.softplus(s.motif(x))); n = z.shape[-1]
-        return z.sum(1) + s.core(x)[:, 0, LEFT - CORE:LEFT - CORE + n] + s.bias
+        out = z.sum(1) + s.core(x)[:, 0, LEFT - CORE:LEFT - CORE + n] + s.bias
+        if PAIR: out = out + torch.einsum("bin,ij,bjn->bn", z, s.pair(), z)
+        return out
+    def pair(s):
+        w = (s.pw + s.pw.t()) / 2
+        return w - torch.diag(torch.diag(w))
     def roughness(s):
         w = s.curve.weight[:, 0]; r = (w[:, 2:] - 2 * w[:, 1:-1] + w[:, :-2]) ** 2
         r[:, UP - 1 - 5:UP + 5] = 0                 # около старта (|d| ≤ 5) острые пики разрешены
@@ -125,7 +132,7 @@ def loss_fn(X, Y, lam=0.05):
     z = net(X.to(DEV)); y = ((Y - MU) / SD).to(DEV); m = torch.isfinite(y)
     Yd = Y.to(DEV); wt = 1.0 + PEAKW * (Yd > Q).float() + PEAKW / 3 * (Yd > Q95).float()
     mse = (((z - torch.nan_to_num(y)) ** 2) * wt)[m].sum() / wt[m].sum()
-    return mse, mse + lam * net.roughness()
+    return mse, mse + lam * net.roughness() + (LAM_PAIR * net.pair().abs().sum() if PAIR else 0)
 
 # ---------- обучение ----------
 fit_s = Sampler(tr_c, 1); VB = [Sampler(ev_c, 2).batch() for _ in range(4 if SMOKE else 25)]
@@ -185,9 +192,13 @@ for k in np.argsort(-imp):
     cv = Wc[k]; info.append({"компонента": int(k), "важность": float(imp[k]), "консенсус": cons.strip("n") or "-",
                              "пик кривой, п.н.": int(d[np.argmax(np.abs(cv))]), "знак": "+" if cv[np.argmax(np.abs(cv))] > 0 else "-"})
 res["компоненты"] = info
+if PAIR:
+    Pm = net.pair().detach().cpu().numpy(); iu = np.triu_indices(K, 1); o = np.argsort(-np.abs(Pm[iu]))[:15]
+    res["пары"] = [{"a": int(iu[0][i]), "b": int(iu[1][i]), "вес": float(Pm[iu][i])} for i in o]; res["доля_ненулевых_пар"] = float((np.abs(Pm[iu]) > 1e-3).mean())
+    log("топ-пары:", res["пары"][:6])
 json.dump(res, open(f"{OUT}/{SP}.distill_{TAG}_summary.json", "w"), ensure_ascii=False, indent=1, default=str)
 np.savez(f"{OUT}/{SP}.distill_{TAG}_weights.npz", core=net.core.weight.detach().cpu().numpy(), motif=Wm, motif_bias=net.motif.bias.detach().cpu().numpy(),
-         curve=Wc, importance=imp, mu_sd=np.array([MU, SD]))
+         curve=Wc, importance=imp, mu_sd=np.array([MU, SD]), pair=net.pair().detach().cpu().numpy())
 try:
     import matplotlib; matplotlib.use("Agg"); import matplotlib.pyplot as plt
     nt = min(12, K); order = np.argsort(-imp)[:nt]; fig, ax = plt.subplots(nt, 2, figsize=(11, 1.9 * nt), gridspec_kw={"width_ratios": [1, 3]})
