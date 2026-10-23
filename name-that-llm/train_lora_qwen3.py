@@ -10,6 +10,9 @@ from sklearn.metrics import balanced_accuracy_score
 from sklearn.model_selection import GroupKFold
 from transformers import AutoConfig, AutoModelForSequenceClassification, AutoTokenizer, get_cosine_schedule_with_warmup
 from peft import LoraConfig, get_peft_model
+import peft.import_utils, peft.tuners.lora.torchao
+# в образе Kaggle torchao 0.10 несовместима с peft и роняет get_peft_model; torchao нам не нужна
+peft.import_utils.is_torchao_available = peft.tuners.lora.torchao.is_torchao_available = lambda: False
 
 T0 = time.time()
 N_LAYERS, MAX_LEN, EPOCHS, LR, BS, ACCUM = 24, 400, 2, 1e-4, 4, 4
