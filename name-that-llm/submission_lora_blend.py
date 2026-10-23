@@ -14,7 +14,7 @@ import peft.import_utils, peft.tuners.lora.torchao
 peft.import_utils.is_torchao_available = peft.tuners.lora.torchao.is_torchao_available = lambda: False
 from peft import PeftModel
 
-W_LORA, W_TFIDF = 1.0, 0.5               # веса смеси log-вероятностей (подобраны на отложенных промптах)
+W_LORA, W_TFIDF = 1.0, 1.0               # веса смеси log-вероятностей; holdout (фолд 0): LoRA 0.326, TF-IDF 0.344, смесь 0.404
 CENTER_THR, CENTER_W = 0.9, 2.0          # порог косинусного расстояния для тем и сила центрирования
 
 def find(pattern):

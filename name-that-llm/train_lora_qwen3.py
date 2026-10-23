@@ -15,7 +15,8 @@ import peft.import_utils, peft.tuners.lora.torchao
 peft.import_utils.is_torchao_available = peft.tuners.lora.torchao.is_torchao_available = lambda: False
 
 T0 = time.time()
-N_LAYERS, MAX_LEN, EPOCHS, LR, BS, ACCUM = 24, 400, 2, 1e-4, 4, 4
+N_LAYERS, MAX_LEN, EPOCHS, LR, HEAD_LR, BS, ACCUM = 24, 400, 4, 2e-4, 1e-3, 4, 4
+# v1 (2 эпохи, lr 1e-4, случайная голова): holdout 0.326, loss после 1-й эпохи ≈ ln18 — недообучение
 OUT = "/kaggle/working"
 
 def find(pattern):
@@ -45,6 +46,7 @@ def build():
     model.enable_input_require_grads()
     lcfg = LoraConfig(r=16, lora_alpha=32, lora_dropout=0.05, task_type="SEQ_CLS",
                       target_modules=["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"])
+    torch.nn.init.zeros_(model.score.weight)   # нулевая голова: старт с равных вероятностей (loss = ln18), без огромных логитов
     model = get_peft_model(model, lcfg)
     for p in model.parameters():          # обучаемые веса в fp32, база в fp16 (T4 не умеет bf16)
         if p.requires_grad:
@@ -64,7 +66,9 @@ def batches(texts, labels=None, bs=BS, shuffle=False, seed=0):
 def fit(texts, labels):
     model = build()
     params = [p for p in model.parameters() if p.requires_grad]
-    opt = torch.optim.AdamW(params, lr=LR, weight_decay=0.01)
+    head = [p for n, p in model.named_parameters() if p.requires_grad and "score" in n]
+    body = [p for n, p in model.named_parameters() if p.requires_grad and "score" not in n]
+    opt = torch.optim.AdamW([{"params": body, "lr": LR}, {"params": head, "lr": HEAD_LR}], weight_decay=0.01)
     steps = EPOCHS * math.ceil(len(texts) / BS / ACCUM)
     sched = get_cosine_schedule_with_warmup(opt, int(0.1 * steps), steps)
     scaler = torch.amp.GradScaler("cuda")
@@ -81,7 +85,7 @@ def fit(texts, labels):
                 scaler.unscale_(opt); torch.nn.utils.clip_grad_norm_(params, 1.0)
                 scaler.step(opt); scaler.update(); opt.zero_grad(); sched.step()
             tot += loss.item() * ACCUM; n += 1
-            if b % 100 == 0:
+            if b % 200 == 0:
                 print(f"ep {ep} batch {b} loss {tot / n:.4f} t={time.time() - T0:.0f}s", flush=True)
     return model
 
