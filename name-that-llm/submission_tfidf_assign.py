@@ -9,6 +9,8 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.cluster import AgglomerativeClustering
 from scipy.optimize import linear_sum_assignment
 
+USE_TOPIC_TRICKS = False  # v1 (True): LB 0.346, CV 0.452; v2 (False): проверка, мешают ли приёмы на скрытом тесте
+
 def find(name):
     for p in [f"/kaggle/input/competitions/name-that-llm/{name}", f"/kaggle/input/name-that-llm/{name}", f"data/{name}"]:
         if os.path.exists(p):
@@ -33,7 +35,7 @@ S = (S - S.mean()) / S.std()
 
 # 2. восстанавливаем темы теста: ~18 ответов (по одному от каждой модели) на промпт
 n_clusters = max(1, int(round(len(test) / len(classes))))
-if len(test) > 1:
+if USE_TOPIC_TRICKS and len(test) > 1:
     T = TfidfVectorizer(sublinear_tf=True, stop_words="english").fit_transform(test.text).toarray()
     grp = AgglomerativeClustering(n_clusters=n_clusters, metric="cosine", linkage="average").fit_predict(T)
 else:
@@ -45,8 +47,8 @@ print("кластеров:", n_clusters, "| размеры:", pd.Series(grp).val
 pred = np.empty(len(test), int)
 for k in np.unique(grp):
     idx = np.where(grp == k)[0]
-    Sk = S[idx] - S[idx].mean(0) if len(idx) > 1 else S[idx]
-    if len(idx) <= len(classes):
+    Sk = S[idx] - S[idx].mean(0) if USE_TOPIC_TRICKS and len(idx) > 1 else S[idx]
+    if USE_TOPIC_TRICKS and len(idx) <= len(classes):
         r, c = linear_sum_assignment(-Sk)
         pred[idx[r]] = c
     else:
