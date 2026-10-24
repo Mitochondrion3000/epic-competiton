@@ -14,8 +14,8 @@ import peft.import_utils, peft.tuners.lora.torchao
 peft.import_utils.is_torchao_available = peft.tuners.lora.torchao.is_torchao_available = lambda: False
 from peft import PeftModel
 
-W_LORA, W_TFIDF = 1.0, 1.0               # веса смеси log-вероятностей; holdout (фолд 0): LoRA v2 0.450, TF-IDF 0.344, смесь 0.469
-CENTER_THR, CENTER_W = 0.9, 2.0          # порог косинусного расстояния для тем и сила центрирования
+W_LORA, W_TFIDF = 1.0, 2.5               # веса смеси; OOF на всех 2699: LoRA 0.438, TF-IDF 0.353, смесь 0.479 (LoRA слишком уверена)
+CENTER_THR, CENTER_W = 0.85, 1.0         # порог косинусного расстояния для тем и сила центрирования (симуляция 1-5 и 3-8 текстов на промпт)
 
 def find(pattern):
     return sorted(glob.glob(f"/kaggle/input/**/{pattern}", recursive=True))[0]
