@@ -1,6 +1,6 @@
 # Name That LLM: сабмит = смесь LoRA Qwen3-8B (24 слоя) и TF-IDF + LogReg + центрирование по темам теста.
 # Kaggle: GPU T4 x2, интернет выключен. Входы: данные соревнования, модель qwen-lm/qwen-3/Transformers/8b-base,
-# вывод ноутбука ivanmitochondrion/name-that-llm-train-lora-qwen3 (папка lora_full).
+# вывод ноутбука ivanmitochondrion/name-that-llm-train-lora-qwen3-v2 (папка lora_full).
 import glob, json, os
 import numpy as np
 import pandas as pd
@@ -14,7 +14,7 @@ import peft.import_utils, peft.tuners.lora.torchao
 peft.import_utils.is_torchao_available = peft.tuners.lora.torchao.is_torchao_available = lambda: False
 from peft import PeftModel
 
-W_LORA, W_TFIDF = 1.0, 1.0               # веса смеси log-вероятностей; holdout (фолд 0): LoRA 0.326, TF-IDF 0.344, смесь 0.404
+W_LORA, W_TFIDF = 1.0, 1.0               # веса смеси log-вероятностей; holdout (фолд 0): LoRA v2 0.450, TF-IDF 0.344, смесь 0.469
 CENTER_THR, CENTER_W = 0.9, 2.0          # порог косинусного расстояния для тем и сила центрирования
 
 def find(pattern):
